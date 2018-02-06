@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <errno.h>
 
 #define MAX_LENGHT_NOME 20
 
@@ -15,7 +16,7 @@ int main(int argc, char *argv[]){
 
     //controllo input da console
     if(argc!=2){
-        perror("numero argomenti non valido");
+        fprintf(stderr, "numero argomenti non valido\n");
         exit(1);
     }
 
@@ -23,20 +24,24 @@ int main(int argc, char *argv[]){
     n = 0;
     // controllo input nome
     if(strlen(argv[1]) >= MAX_LENGHT_NOME){
-        perror("nome file troppo lungo");
+        fprintf(stderr, "nome file troppo lungo\n");
         exit(1);
     }
     strcpy(nome, argv[1]);
 
     //timer start
     begin = clock();
+    if(begin<0){
+        perror("Problema clock()");
+    }
+
 
     // gli argomenti sulla linea di comando sono in n e nome
     // apre file in scrittura
     FILE * f = fopen(nome,"rb");
     if(f==NULL) {  // se il file non è stato aperto visualizza messaggio d'errore e esci
-    perror("Errore apertura file");
-    exit(1);
+        perror("Errore apertura file");
+        exit(1);
     }
 
     // legge valori sul file e sommatoria in n
@@ -58,12 +63,15 @@ int main(int argc, char *argv[]){
     // chiude file 
     int e = fclose(f);
     if(e!=0) {
-    perror("Errore chiusura file");
-    exit(1);
+        perror("Errore chiusura file");
+        exit(1);
     }
 
     // timer stop
     end = clock();
+    if(end<0){
+        perror("Problema clock()");
+    }
 
     // determiniamo i secondi trascorsi
     time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
