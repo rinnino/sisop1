@@ -3,6 +3,7 @@
 #include <string.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <time.h>
 
 #define MAX_LENGHT_NOME 20
 
@@ -11,6 +12,8 @@ int main(int argc, char *argv[]){
     int n;
     char nome[MAX_LENGHT_NOME];
     int f; //file descriptor
+    double time_spent;
+    clock_t begin, end;
 
     //inizializziamo n e nome
     n = atoi(argv[1]);
@@ -20,6 +23,9 @@ int main(int argc, char *argv[]){
         exit(1);
     }
     strcpy(nome, argv[2]);
+
+    //timer start
+    begin = clock();
 
     // gli argomenti sulla linea di comando sono in n e nome
     // apre file in scrittura
@@ -43,4 +49,13 @@ int main(int argc, char *argv[]){
     perror("Errore chiusura file");
     exit(1);
     }
+
+    // timer stop
+    end = clock();
+
+    // determiniamo i secondi trascorsi
+    time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
+
+    // stampa tempo esecuzione
+    printf("scrittura file in %lf secondi\n", time_spent);
 }
