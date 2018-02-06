@@ -16,7 +16,7 @@ int main(int argc, char *argv[]){
     // inizializziamo n e nome
     n = 0;
     // controllo input nome
-    if(strlen(argv[1])>= MAX_LENGHT_NOME){
+    if(strlen(argv[1]) >= MAX_LENGHT_NOME){
         perror("nome file troppo lungo");
         exit(1);
     }

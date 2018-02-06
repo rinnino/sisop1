@@ -2,14 +2,21 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define MAX_LENGHT_NOME 20
+
 int main(int argc, char *argv[]){
     //variabili
     int n; // contiene la sommatoria
     int b; // buffer lettura
-    char nome[20];
+    char nome[MAX_LENGHT_NOME];
 
     //inizializziamo n e nome
     n = 0;
+    // controllo input nome
+    if(strlen(argv[1]) >= MAX_LENGHT_NOME){
+        perror("nome file troppo lungo");
+        exit(1);
+    }
     strcpy(nome, argv[1]);
 
     // gli argomenti sulla linea di comando sono in n e nome
