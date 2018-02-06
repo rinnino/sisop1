@@ -13,6 +13,12 @@ int main(int argc, char *argv[]){
     double time_spent;
     clock_t begin, end;
 
+    //controllo input da console
+    if(argc!=2){
+        perror("numero argomenti non valido");
+        exit(1);
+    }
+
     //inizializziamo n e nome
     n = 0;
     // controllo input nome
@@ -63,7 +69,7 @@ int main(int argc, char *argv[]){
     time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
 
     // stampa tempo esecuzione
-    printf("scrittura file in %lf secondi\n", time_spent);
+    printf("lettura file in %lf secondi\n", time_spent);
 
     printf("sommatoria: %d\n", n);
 

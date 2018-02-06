@@ -1,0 +1,22 @@
+developer@onion:~/Desktop/sisop1/lezione1/1$ ./esercizio1scrivi 50000000 binario
+scrittura file in 0.853356 secondi
+developer@onion:~/Desktop/sisop1/lezione1/1$ ./esercizio1leggi binario
+lettura file in 0.711504 secondi
+sommatoria: 1333106752
+developer@onion:~/Desktop/sisop1/lezione1/1$ cd ..
+developer@onion:~/Desktop/sisop1/lezione1$ cd 2
+developer@onion:~/Desktop/sisop1/lezione1/2$ make
+gcc -Wall -std=c99 -g -O -c esercizio2scrivi.c
+gcc -Wall -std=c99 -g -O -o esercizio2scrivi esercizio2scrivi.o
+gcc -Wall -std=c99 -g -O -c esercizio2leggi.c
+gcc -Wall -std=c99 -g -O -o esercizio2leggi esercizio2leggi.o
+rm *.o
+developer@onion:~/Desktop/sisop1/lezione1/2$ ./esercizio2scrivi 50000000 binario
+scrittura file in 56.695275 secondi
+developer@onion:~/Desktop/sisop1/lezione1/2$ ./esercizio2leggi binario
+lettura file in 9.819154 secondi
+sommatoria: 1333106752
+
+
+
+possiamo concludere come le funzioni dotate di buffer ( fread fwrite ) siano molto più veloci di quelle unbuffered.

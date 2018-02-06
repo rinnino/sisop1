@@ -15,6 +15,12 @@ int main(int argc, char *argv[]){
     double time_spent;
     clock_t begin, end;
 
+    //controllo input da console
+    if(argc!=3){
+        perror("numero argomenti non valido");
+        exit(1);
+    }
+
     //inizializziamo n e nome
     n = atoi(argv[1]);
     // controllo input nome
