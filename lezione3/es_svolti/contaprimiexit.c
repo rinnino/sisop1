@@ -8,7 +8,7 @@
 #include <assert.h>   
 #include "xerrors.h"
 
-// primo esempio di pipe per la comunicazione fra processi
+// esercizio per la comunicazione fra processi usando valore ritornato
 
 
 // restituisce true/false a seconda che n sia primo o composto
@@ -53,7 +53,7 @@ int main(int argc, char *argv[])
   }
 
   // codice del processo padre
-  // legge i risultati dalla pipe
+  // legge i risultati da status
   tot = 0;
   i=0;
   //attendiamo i figli e generiamo la somma dal valore tornato dai figli
