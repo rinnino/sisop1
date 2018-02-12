@@ -1,0 +1,3 @@
+Bisogna per forza contare i processi da attendere oppure esiste un motodo più furbo ?
+
+nella funziona cerca() c'è un errore : i<=b invece di i<b
