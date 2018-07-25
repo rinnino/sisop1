@@ -58,6 +58,14 @@ int main(int argc, char *argv[]){
 
     // legge valori sul file e sommatoria in n
     while(1) {
+        //scrivo tutti zeri nel buffer, per risolvere del bug se
+        //la dimensione del buffer non è divisore.
+        //for(int i=0; i<dimbuff; i++){
+        //    buff[i] = 0;
+        //}
+
+        memset(buff, 0, dimbuff*sizeof(int));
+
         int e = read(f, buff, dimbuff*sizeof(int)); // legge da f
         if(e == 0) {
             break;
