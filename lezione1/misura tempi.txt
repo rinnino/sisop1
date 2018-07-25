@@ -1,4 +1,4 @@
-developer@onion:~/Desktop/sisop1/lezione1/1$ ./esercizio1scrivi 50000000 binario
+developer@onion:~/Desktop/sisop1/lezione1/1$ ./esercizio1scrivi  binario
 scrittura file in 0.853356 secondi
 developer@onion:~/Desktop/sisop1/lezione1/1$ ./esercizio1leggi binario
 lettura file in 0.711504 secondi
