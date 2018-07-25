@@ -8,8 +8,8 @@
 
 int main(int argc, char *argv[]){
     //variabili
-    int n;
-    char nome[MAX_LENGHT_NOME];
+    int n; // numero max
+    char nome[MAX_LENGHT_NOME]; //nome del file
     double time_spent;
     clock_t begin, end;
 
@@ -22,8 +22,8 @@ int main(int argc, char *argv[]){
     //inizializziamo n e nome
     n = atoi(argv[1]);
     // controllo input nome
-    if(strlen(argv[1]) >= MAX_LENGHT_NOME){
-        fprintf(stderr, "nome file troppo lungo");
+    if(strlen(argv[2]) >= MAX_LENGHT_NOME){
+        fprintf(stderr, "nome file troppo lungo\n");
         exit(1);
     }
     strcpy(nome, argv[2]);
@@ -41,9 +41,6 @@ int main(int argc, char *argv[]){
         perror("Errore apertura file");
         exit(1);
     }
-
-    //otteniamo n da argv[1]
-    n = atoi(argv[1]); 
 
     // scrive valori sul file
     for(int i=1;i<=n;i++) {
