@@ -13,7 +13,6 @@
 #include "xerrors.h"
 
 // prototipi di funzione
-void handler(int s);
 int *random_array(int n);
 int intcmp(const void *a, const void *b);
 void array_sort(int *a, int n);
@@ -27,13 +26,6 @@ int main(int argc, char **argv)
     //inizializzazione rand
     srand(time(NULL));
 
-    // definisce signal handler 
-    struct sigaction sa;
-    sa.sa_handler = handler;
-    sigemptyset(&sa.sa_mask);     // setta a "insieme vuoto" sa.sa_mask maschera di segnali da bloccare 
-    sa.sa_flags = SA_RESTART;     // restart system calls  if interrupted
-    sigaction(SIGUSR1,&sa,NULL);  // handler per USR1
-
     if(argc!= 2)
     {
         fprintf(stderr,"Uso: nomeProgramma n\n");
@@ -45,10 +37,6 @@ int main(int argc, char **argv)
     //creazione area memoria condivisa
     int e, shmid;
     pid_t pid;
-    pid_t pidPadre;
-
-    //memorizzo pid padre
-    pidPadre = getpid();
 
     // creazione array di memoria condivisa in lettura scrittura
     shmid = shmget(IPC_PRIVATE,n*sizeof(int),0600);
@@ -93,10 +81,6 @@ int main(int argc, char **argv)
         // detach memoria condivisa  
         e = shmdt(memoriaCondivisa);
         if(e<0) {perror("shmdt"); exit(1);}
-
-        //devo inviare un segnale al padre per risvegliarlo
-        kill(pidPadre, 10); //10 = sigusr1
-
         exit(0);
        
     }else{
@@ -110,9 +94,8 @@ int main(int argc, char **argv)
         printf("[Padre] ho in carico l'array da [0] a [%d]\n", (n/2));
 
         //attendo terminazione figlio
-        pause(); //attesa segnale, no busy waiting con wait!
-        
-        
+        pid  = xwait(NULL,__LINE__,__FILE__);
+
         //stampa debug array
         printf("[Padre] Array ordinato:");
         for(int i=0; i<n; i++){
@@ -138,15 +121,6 @@ int main(int argc, char **argv)
 
 
 
-}
-
-// funzione che viene invocata quando viene ricevuto un segnale USR1 
-void handler(int s)
-{
-    if(s==SIGUSR1){
-        //aspetto questo segnale ma senza far nulla
-        printf("il processo %d ha ricevuto il segnale %d\n", getpid(), s);
-    }
 }
 
 // genera array di n elementi con interi random tra 0 e RAND_MAX 
