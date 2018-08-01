@@ -60,8 +60,8 @@ int main(int argc, char *argv[])
   while(i<p) { 
     e = xwait(&status,__LINE__,__FILE__);
     assert(e>0);
-    if(WIFEXITED(status) == true){
-      nprimi = WEXITSTATUS(status);
+    if(WIFEXITED(status) == true){ //se il figlio è terminato normalmente ...
+      nprimi = WEXITSTATUS(status); // fetch valore ritornato dal figlio
       printf("P Figlio con pid %d ha trovato %d primi\n",e , nprimi);
       tot += nprimi;
       i++;
