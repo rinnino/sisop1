@@ -8,6 +8,7 @@
 int *random_array(int n);
 int intcmp(const void *a, const void *b);
 void array_sort(int *a, int n);
+bool check_sort(int *a, int n);
 
 int main(int argc, char *argv[])
 {
@@ -179,6 +180,13 @@ int main(int argc, char *argv[])
         }
         printf("\n");
 
+        //check finale array
+        if(check_sort(array, n)){
+            printf("[padre] check finale superato, ordine array verificato.\n");
+        }else{
+            printf("[padre] check finale NON superato, ordine array NON verificato!\n");
+        }
+
     }
     
 
@@ -204,4 +212,12 @@ int intcmp(const void *a, const void *b)
 void array_sort(int *a, int n)
 {
   qsort(a,n,sizeof(int), intcmp);
+}
+
+// verifica che array a[0..n] sia ordinato 
+bool check_sort(int *a, int n)
+{
+  for(int i=0; i < n-1; i++)
+     if(a[i] > a[i+1]) return false;
+  return true;
 }
