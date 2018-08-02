@@ -1,16 +1,8 @@
-#define _GNU_SOURCE
-#include <stdio.h>
-#include <stdlib.h>
-#include <sys/types.h>
-#include <sys/wait.h>
-#include <unistd.h>
-#include <stdbool.h>  // gestisce tipo bool (per variabili booleane)
-#include <assert.h>   // permette di usare la funzione assert
+#include "xerrors.h"
 
 // xerrors.c
 // collezione di chiamate a funzioni di sistema con controllo output
 // i prototipi sono in xerrors.h
-
 
 // operazioni su FILE *
 FILE *xfopen(const char *path, const char *mode, int linea, char *file) {
@@ -57,3 +49,48 @@ int xpipe(int pipefd[2], int linea, char *file) {
   }
   return e;
 }
+
+
+// memoria condivisa
+int xshmget(key_t key, size_t size, int shmflg, int linea, char *file)
+{
+	int e = shmget(key, size, shmflg);
+	if(e== -1) {
+    fprintf(stderr,"== %d == Linea: %d, File: %s\n",getpid(),linea,file);
+    perror("  shmget"); 
+    exit(1);
+  }
+  return e;
+}
+
+void *xshmat(int shmid, const void *shmaddr, int shmflg, int linea, char *file) {
+	void *e = shmat(shmid, shmaddr, shmflg);
+	if(e == (void *) -1) {
+    fprintf(stderr,"== %d == Linea: %d, File: %s\n",getpid(),linea,file);
+    perror("  shm attach"); 
+    exit(1);
+  }
+  return e;
+}
+
+
+int xshmdt(const void *shmaddr, int linea, char *file) {
+	int e = shmdt(shmaddr);
+	if(e== -1) {
+    fprintf(stderr,"== %d == Linea: %d, File: %s\n",getpid(),linea,file);
+    perror("  shm detach"); 
+    exit(1);
+  }
+  return e;
+}
+
+int xshmctl(int shmid, int cmd, struct shmid_ds *buf, int linea, char *file) {
+	int e = shmctl(shmid, cmd, buf);
+	if(e== -1) {
+    fprintf(stderr,"== %d == Linea: %d, File: %s\n",getpid(),linea,file);
+    perror("  shmctl"); 
+    exit(1);
+  }
+  return e;
+}
+

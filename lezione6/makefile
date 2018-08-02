@@ -2,7 +2,7 @@ CFLAGS=-Wall -std=c99 -g -O
 CC=gcc
 
 # eseguibili da creare
-EXECS=primiP primiPsig primiPsigSleep
+EXECS=primiP primiPsig primiPsigSleep segnaliRT
 
 all: $(EXECS) clean
 
@@ -23,6 +23,12 @@ primiPsigSleep: primiPsigSleep.o xerrors.o
 
 primiPsigSleep.o: primiPsigSleep.c xerrors.c
 	$(CC) $(CFLAGS) -c primiPsigSleep.c -o primiPsigSleep.o
+
+segnaliRT: segnaliRT.o xerrors.o
+	$(CC) $(CFLAGS) -o segnaliRT segnaliRT.o xerrors.o
+
+segnaliRT.o: segnaliRT.c xerrors.c
+	$(CC) $(CFLAGS) -c segnaliRT.c -o segnaliRT.o
 
 clean:
 	rm *.o
