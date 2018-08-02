@@ -18,6 +18,7 @@ int *random_array(int n);
 int intcmp(const void *a, const void *b);
 void array_sort(int *a, int n);
 bool check_sort(int *a, int n);
+void merge(int *a, int m, int *b, int n, int *c);
 
 // main
 int main(int argc, char **argv)
@@ -114,18 +115,31 @@ int main(int argc, char **argv)
         
         
         //stampa debug array
-        printf("[Padre] Array ordinato:");
+        printf("[Padre] array dopo ordine parziale da parte dei 2 processi:");
         for(int i=0; i<n; i++){
             printf(" [%d]", memoriaCondivisa[i]);
         }
         printf("\n");
 
+        //array per contenere risultato finale
+        int ris[n];
+
+        //merge
+        merge(memoriaCondivisa, ((n/2)+1), (memoriaCondivisa+(1+(n/2))), n-((n/2)+1), ris);
+
+        //stampa debug array
+        printf("[Padre] Array ordinato:");
+        for(int i=0; i<n; i++){
+            printf(" [%d]", ris[i]);
+        }
+        printf("\n");
+
         //check ordine
-        //if(check_sort(memoriaCondivisa, n)){
-        //    printf("[Padre] Array condiviso ordinato.");
-        //}else{
-        //    printf("[Padre] Array condiviso NON ordinato!");
-        //}
+        if(check_sort(ris, n)){
+            printf("[Padre] Array condiviso ordinato.\n");
+        }else{
+            printf("[Padre] Array condiviso NON ordinato!\n");
+        }
 
         // detach e rimozione memoria condivisa
         e = shmdt(memoriaCondivisa);
@@ -177,4 +191,20 @@ bool check_sort(int *a, int n)
   for(int i=0; i < n-1; i++)
      if(a[i] > a[i+1]) return false;
   return true;
+}
+
+void merge(int *a, int m, int *b, int n, int *c){
+	int pa = 0, pb = 0, pc = 0;
+	while(pa < m && pb < n){
+		if(a[pa] < b[pb])
+			c[pc++] = a[pa++];
+		else
+			c[pc++] = b[pb++];
+	}
+	if(pa == m)
+		while(pb < n)	//Array A exhausted
+			c[pc++] = b[pb++];
+	else
+		while(pa < m)	//Array B exhausted
+			c[pc++] = a[pa++];
 }
