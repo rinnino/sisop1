@@ -36,6 +36,7 @@ int main(int argc, char **argv)
 
     //creazione area memoria condivisa
     int e, shmid;
+    //identificatore pid
     pid_t pid;
 
     // creazione array di memoria condivisa in lettura scrittura
