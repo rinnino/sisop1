@@ -68,21 +68,16 @@ int massimo(int *a, int n, int p) {
     dati argomenti[p];
 
     // creazione di p thread con il loro range di numeri
+    //num determina il numero di thread che avranno (n/p)+1 numeri
+    //base tiene conto della posizione di partenza dell array per
+    //un certo thread. il primo thread avrà base 0, il secondo 
+    // 0 + "quantità numeri thread 0", e cosi via ...
     for(int i=0,num=n%p,base=0; i<p; i++){
         //prepariamo gli argomenti
         argomenti[i].n_thread = i; //identificativo
-        
+  
         /*
-        * schema di prova commentato funziona ma non va bene
-        */
-        
-        //argomenti[i].numeri = a+(i*(n/p)); //aritmetica puntatori
-
-        //formula : ( max range ) - ( min range)
-        //argomenti[i].n = ((i==p-1) ? n : (i+1)*(n/p)) - (i*(n/p));
-
-        /*
-        * schema nuovo, esempio:
+        * esempio:
         * n=20 p=3 n/p=6 n%p=2 quindi le aree saranno:
         * da 0 a 7   (n/p +1 elementi)
         * da 7 a 14  (n/p +1 elementi)
@@ -92,16 +87,19 @@ int massimo(int *a, int n, int p) {
         * 
         */
 
-        //versione non compatta
         if(num>0){ //se dobbiamo assegnare al thread n/p+1 elementi
             argomenti[i].n = (n/p)+1;
             num--;
              
-        }else{
+        }else{ //oppure n/p elementi
             argomenti[i].n = n/p;
         }
         
+        //determiniamo puntatore primo elemento
         argomenti[i].numeri = a+base; //aritmetica puntatori
+
+        //ed aggiorniamo la variabile base per sapere dove partire
+        //col prossimo thread
         base += argomenti[i].n;
 
         //creazione thread
