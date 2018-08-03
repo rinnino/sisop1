@@ -11,7 +11,7 @@ LDFLAGS=-lpthread
 CC=gcc
 
 # eseguibili da creare
-EXECS=somma_primi tabella_primi
+EXECS=somma_primi tabella_primi primoThread
 
 
 all: $(EXECS)
@@ -31,6 +31,12 @@ tabella_primi: tabella_primi.o  xerrors.o
 tabella_primi.o: tabella_primi.c  xerrors.h
 	$(CC) $(CFLAGS) -o tabella_primi.o -c tabella_primi.c
 
+# primo esercizio sui thread
+primoThread: primoThread.o  xerrors.o
+	$(CC) $(CFLAGS) -o primoThread primoThread.o xerrors.o $(LDFLAGS)
+
+primoThread.o: primoThread.c  xerrors.h
+	$(CC) $(CFLAGS) -o primoThread.o -c primoThread.c
 
 # xerrors.o
 xerrors.o: xerrors.c  xerrors.h
