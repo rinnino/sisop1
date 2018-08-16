@@ -1,0 +1,243 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html><head>
+  
+  <title>Appunti Laboratorio Sistemi Operativi, Parte 5</title><meta http-equiv="content-type" content="text/html; charset=ISO-8859-1"></head>
+<body><br><h2>APPUNTI DI SISTEMI OPERATIVI PER LE ESERCITAZIONI IN LABORATORIO</h2><h2>PARTE 5 - MEMORIA CONDIVISA</h2><br><br>Le
+system calls per
+l'utilizzo di "segmenti" di memoria condivisa fanno parte, assieme a
+quelle per i semafori (che si vedranno in seguito) delle strutture di
+Inter Process Communication (IPC) dello standard XSI (X/Open System
+Interface).<br>Queste strutture hanno un identificatore; possono essere acquisite,
+utilizzate e rimosse mediante system calls.<br>
+É possibile visualizzare le strutture allocate con il comando
+"<span style="font-family: monospace;">ipcs</span>" che mostra fra l'altro (come secondo campo) l'identificatore e
+(come penultimo campo) l'utente proprietario della struttura.<br>
+Le strutture, proprio perché servono a più processi, non
+vengono automaticamente deallocate quando termina il processo che ne ha
+richiesto l'allocazione (potrebbe trattarsi di un processo
+"inizializzatore" che crea altri processi che devono cooperare, crea le
+strutture condivise per farli cooperare, e poi termina).<br>
+In caso i processi non abbiano rimosso le strutture allocate
+(dimenticanza nel programma, o terminazione anomala), per rimuoverle si
+può usare:<br>
+<pre>ipcrm -s identificatore&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; (per i semafori)</pre>
+<pre>ipcrm -m identificatore&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; (per i segmenti di memoria condivisa)</pre>
+<b> Non lasciare strutture allocate</b> perché ci sono limiti,
+per default piuttosto bassi, sul numero di strutture allocabili in un
+sistema. <br>
+Per coprire il caso della terminazione anomala, questo è un
+esempio in cui ha senso associare al segnale di terminazione una
+funzione che rimuove strutture allocate e poi chiama exit(). Si noti
+:-) che la stessa funzione può essere richiamata esplicitamente
+al termine del programma.<br><br><h4 style="text-align: justify;">*******************************************************</h4>
+
+<h4 style="text-align: justify;">MEMORIA CONDIVISA <br>
+</h4>
+
+<h4 style="text-align: justify;">*******************************************************</h4>
+<div style="text-align: justify;"> Normalmente i processi Unix non
+condividono la memoria; questo non si ha nemmeno per i processi
+"parenti": ad esempio, un processo figlio
+eredita <i>una copia</i> dei dati del padre; se i due processi
+modificano
+quei dati dopo la fork, ognuno modifica la propria copia.<br>
+(Nota: la tipica implementazione attuale, cioè in sistemi in cui
+la memoria è gestita con paginazione, e in particolare su Linux,
+in realtà effettua il cosiddetto "copy on write", cioè lo
+sdoppiamento in due copie solo se necessario, proprio quando uno dei
+due processi modifica un dato, sdoppiando la pagina o le pagine
+modificate; vedere ad esempio il testo di Tanenbaum e Bos, "Modern Operating
+Systems", 4a ed, sez. 3.5.5).<br>
+<br>
+La possibilità di condividere memoria è stata introdotta
+(come le altre funzioni IPC - Inter Process Communication) nella
+versione System V di Unix e poi in molte altre versioni, oggi quelle
+che forniscono le estensioni XSI. <br>
+<br>
+Ad un segmento di memoria condivisa si accede tramite le system
+calls seguenti:<br>
+<br>
+SHMGET, SHMAT:<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp; #include &lt;sys/ipc.h&gt;<br>
+&nbsp;&nbsp;&nbsp;&nbsp; #include &lt;sys/shm.h&gt;<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp; int shmget(key_t key, size_t size, int shmflg);<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp; void *shmat(int shmid, void *shmaddr, int
+shmflg);<br>
+<br>
+<i>shmget </i>restituisce un identificatore di un segmento di memoria
+condivisa di dimensione size; a seconda del valore di key e shmflg, il
+segmento viene creato; lo stesso avviene nel caso dei "semafori" che si vedono in Programmazione Concorrente.<br>
+<br>
+<i>shmat </i>esegue il collegamento del segmento shmid allo spazio di
+indirizzi del processo chiamante, ad un indirizzo che, se il parametro
+shmaddr è NULL, viene scelto dal sistema e restituito come
+valore della funzione.<br>
+<br>
+La chiave passata a <span style="font-style: italic;">shmget </span>serve a fare in modo che i processi di un insieme A, che
+devono condividere un segmento di memoria, possano
+acquisire <i>lo stesso segmento</i>, che verrà effettivamente
+condiviso, mentre un altro insieme B di processi, che devono coordinarsi fra di loro
+ma non con quelli in A, possa acquisire un segmento che sia garantito
+essere <i>diverso </i>da quello che usano i processi dell'insieme A.&nbsp;<br>
+<br>
+In particolare, il meccanismo funziona così. Il segmento viene <i>creato</i>
+se:<br>
+<br>
+- non esiste nel sistema operativo un segmento associato a
+key, e semflg&amp;IPC_CREAT é vero; oppure, se:<br>
+<br>
+- "key" è IPC_PRIVATE<br>
+<br>
+NB "&amp;" è l'operatore che effettua l'<i>and</i> bit per bit
+fra due interi, cioè "x &amp; y" è il numero intero
+la cui rappresentazione binaria ha degli 1 nelle posizioni in cui sia
+x che y hanno 1, e ha degli 0 nelle altre posizioni; IPC_CREAT è
+un numero la cui rappresentazione binaria ha un solo 1, in una
+posizione
+nota - in particolare il decimo bit - e 0 in tutte le altre posizioni.
+Pertanto semflg&amp;IPC_CREAT è un numero che è diverso
+da zero, cioè "vero" nel linguaggio C, se e solo se "semflg" ha
+un 1 nel
+decimo
+bit, ad esempio:<br>
+<pre>shmflg			0110.....<b>1</b>110110110			0110.....<b>0</b>110110110<br></pre>
+<pre>IPC_CREAT		0000....0<b>1</b>000000000			0000....0<b>1</b>000000000</pre>
+<pre>shmflg&amp;IPC_CREAT	0000....0<b>1</b>000000000 (nonzero)		0000....0<b>0</b>000000000 (zero)<br></pre>
+Un giochino del genere viene utilizzato nelle chiamate di sistema tutte
+le volte che serve compattare in un numero intero diverse informazioni
+binarie o comunque rappresentabili in un piccolo numero di bit, ad
+esempio per passare a una funzione un unico parametro intero che
+contiene queste diverse informazioni, invece di tanti parametri. In
+questo caso, se vogliamo dire a semget di creare il semaforo qualora
+non esista, passiamo come terzo argomento:<br>
+<br>
+x | IPC_CREAT<br>
+<br>
+dove "x" specifica le altre opzioni, e facendo l'<i>or </i>bit per bit
+(operatore "|") con IPC_CREAT, si ottiene il numero che è uguale
+a "x" nei bit diversi dal decimo, e ha un 1 nel decimo bit.<br>
+<br>
+Quindi se si vuole che più processi acquisiscano lo stesso segmento si può:<br>
+<br>
+1) far partire indipendentemente diversi processi e fare usare a tutti
+shmget con la stessa chiave: questa deve essere DIVERSA da chiavi usate
+da altri processi anche di altri utenti; e la shmget avrà le
+opzioni per creare il segmento se non esiste, in questo
+modo il primo processo che arriva alla shmget, crea effettivamente il
+segmento, i processi che arrivano successivamente, ottengono
+semplicemente lo stesso identificatore<br>
+<br>
+2) far acquisire le strutture con shmget da un processo padre e
+farle utilizzare anche da processi figli, che quindi non devono fare
+shmget ma semplicemente usare l'identificatore restituito dalla shmget.
+In questo caso nella shmget si puo' usare IPC_PRIVATE come chiave. <br>
+<br>
+I 9 bit meno significativi di shmflg forniscono i diritti di accesso in
+modo simile ai files, in 3 triplette che riguardano, rispettivamente, i
+diritti dei processi dello stesso utente che ha creato il segmento, i
+diritti di utenti dello stesso gruppo, e i diritti degli altri utenti:<br>
+<br>
+ra-ra-ra-&nbsp;&nbsp;&nbsp; (r = read ; a = alter; il terzo bit
+di ogni tripletta non è usato ma ne sono previsti 3 per usare
+gli stessi pattern mnemonici usati per i files)<br>
+<br>
+Ad esempio il flag 0600 (in ottale), ovvero 110000000 (in binario),
+mostrato come:<br>
+<br>
+ra-------<br>
+<br>
+dal comando ipcs, dà diritto di lettura e alterazione solo al
+proprietario.<br>
+<br>
+Quindi nel caso 1 si può chiamare ad esempio da ogni processo
+dell'insieme che deve usare lo stesso segmento:<br>
+<br>
+shmid = shmget(mykey, size, 0600 | IPC_CREAT ) <br>
+<br>
+dove il valore di "mykey" deve essere lo stesso per tutte le chiamate;
+se ogni utente crea un solo segmento, ciascuno può ad
+esempio usare il suo id come chiave mettendo "getuid()" come primo
+parametro.<br>
+<br>
+L'importante è che i programmi che girano su una stessa macchina
+usino lo stesso sistema per generare le chiavi, che garantisca chiavi
+diverse per diversi insiemi di processi che devono sincronizzarsi con
+altri processi dello stesso insieme, ma <i>non </i>devono
+inavvertitamente interagire con processi di un altro insieme.<br>
+Per supportare questo esiste una funzione "ftok"; si veda tuttavia "man
+ftok", sezione "Note". Questa funzione usa un numero associato ai file
+- il numero di "inode" - per generare le chiavi, ma in versioni
+recenti,
+poichè il numero di bit utilizzati per questo numero è
+cresciuto,
+non si ha più la garanzia che la funzione <i>funzioni</i> per
+lo
+scopo di avere chiavi diverse.<br>
+Se un programma non si adegua e usa <i>per caso</i>
+una
+chiave di un segmento di memoria condivisa già allocato per altri
+scopi, se poi
+tenta (con le chiamate di sistema descritte nel seguito) di modificarne
+il valore, può ottenere
+un errore se il segmento è di un altro utente (un altro identificatore
+utente, anche se la macchina ha un solo utente umano) e il programma
+non ha il diritto di modificarlo; se no, entrambi
+probabilmente vedranno non funzionare la sincronizzazione dei processi
+programmata con
+(si spera) tanta cura :-)<br><br>
+Nel caso 2 si può invece usare:<br>
+<br>
+shmid = shmget(IPC_PRIVATE, size, 0600) <br>
+<br>*********************************<br><br>Per quanto riguarda la <br><br>SHMAT:<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp; void *shmat(int shmid, const void *shmaddr, int
+shmflg);<br><br>esegue, come già detto, il collegamento del segmento <span style="font-style: italic;">shmid</span> allo spazio di
+indirizzi del processo chiamante, ad un indirizzo che, se il parametro
+<span style="font-style: italic;">shmaddr</span> è NULL, viene scelto dal sistema e restituito come
+valore della funzione (il flag <span style="font-style: italic;">shmflg</span> serve per comportamenti opzionali, passare 0 come default).<br><br>Per quanto riguarda i casi 1 e 2 di utilizzo di <span style="font-style: italic;">shmget</span>:<br><ul><li>nel caso 1, dopo aver fatto <span style="font-style: italic;">shmget</span>, i processi fanno <span style="font-style: italic;">shmat</span>; </li><li>nel caso 2&nbsp;il processo padre dopo aver fatto <span style="font-style: italic;">shmget</span>, può fare anche <span style="font-style: italic;">shmat</span>,
+nel qual caso i processi discendenti avranno la memoria collegata allo
+stesso indirizzo; oppure ogni processo usa l'identificatore ottenuto
+con <span style="font-style: italic;">shmget</span> e lo passa a <span style="font-style: italic;">shmat</span>. </li></ul>
+Se processi diversi chiamano <i>shmat</i> per lo stesso segmento,
+possono ottenere indirizzi diversi per accedervi; di questo si deve
+tenere conto se si vuole utilizzare la memoria condivisa per allocare
+liste linkate o strutture simili in cui si vorrebbe far utilizzare da
+processi diversi<br>
+valori di puntatori per accedere a parti della struttura.<br>
+<br>
+L'uso di <i>shmget </i>e <i>shmat</i> è illustrato
+dall'esempio seguente in cui vengono stampati i valori di puntatori a diverse parti dell'immagine del processo.<br><br>
+<pre>::::::::::::::<br>mem.c<br>::::::::::::::<br><br>/* <br>   stampando il valore di alcuni puntatori, <br>   illustra come vengono assegnati gli indirizzi (virtuali) <br>   dal compilatore, e quali vengono restituiti dalla malloc e dalla shmat <br><br>*/<br><br>#include &lt;malloc.h&gt;<br>#include &lt;stdio.h&gt;<br>#include &lt;unistd.h&gt;<br>#include &lt;wait.h&gt;<br>#include &lt;sys/types.h&gt;<br>#include &lt;sys/ipc.h&gt;<br>#include &lt;sys/sem.h&gt;<br>#include &lt;sys/shm.h&gt;<br><br>int ext1,ext2;<br><br>void f(int n)<br>{<br>  int a;<br><br>  static int s;<br>  <br>  /* stampa l'indirizzo del parametro, della variabile "automatica"<br>     e della variabile "statica" */<br><br>  printf("%p %p %p\n",&amp;n, &amp;a, &amp;s);<br>  if (n&gt;0) f(n-1);<br>}<br><br>int main()<br><br>{<br><br>int b,c,n;<br>char *p;<br><br>int shmid1,*addr1;<br>int shmid2;<br>char *addr2;<br><br>/* stampa l'indirizzo delle variabili globali e di quelle interne al main */<br><br>printf("var esterne: %p %p\n",&amp;ext1,&amp;ext2);<br><br>printf("interne al main: %p %p\n",&amp;b, &amp;c);<br><br>printf("dati della funzione: parametro, var. automatica, var. statica \n");<br><br>/* la funzione e' ricorsiva, f(5) da' luogo a 5 chiamate ricorsive:<br>   per ogni chiamata, sulla stack c'e' una copia diversa del parametro <br>   e delle variabili locali - ma non di quelle statiche */<br><br>f(5);<br><br>/* stampa i valori restituiti da chiamate successive di malloc */<br><br>printf("malloc : %p\n",malloc(1024));<br>printf("malloc : %p\n",malloc(1024));<br>printf("malloc : %p\n",malloc(1024));<br>printf("malloc : %p\n",malloc(1024));<br><br>/* alloca memoria condivisa per un array di 100 interi e uno di 100 caratteri */<br><br>shmid1 = shmget(IPC_PRIVATE,100*sizeof(int),0600);<br>if (shmid1 == -1) perror("Creazione memoria condivisa");<br><br>shmid2 = shmget(IPC_PRIVATE,100*sizeof(char),0600);<br>if (shmid2 == -1) perror("Creazione memoria condivisa");<br><br>n= fork();<br>if (n == -1) perror("Fork");<br><br>if (n == 0)<br>   {  /* processo figlio */<br>        addr1 = (int *) shmat(shmid1, NULL, 0);<br>        addr2 = (char *) shmat(shmid2, NULL, 0);<br>	printf("shmat processo figlio al segmento di 100 interi: %p\n",addr1);<br>	printf("shmat processo figlio al segmento di 100 char: %p\n",addr2);<br>   }<br>else<br>   {  /* processo padre */<br>        addr2 = (char *) shmat(shmid2, 0, 0);<br>        addr1 = (int *) shmat(shmid1, 0, 0);<br>	printf("shmat processo padre al segmento di 100 interi: %p\n",addr1);<br>	printf("shmat processo padre al segmento di 100 char: %p\n",addr2);<br>	wait(NULL);<br>	shmctl(shmid1,IPC_RMID,NULL);<br>	shmctl(shmid2,IPC_RMID,NULL);<br>   }<br>}<br><br>::::::::::::::<br><br></pre>La figura illustra i valori che risultano da una esecuzione in laboratorio (architettura a 64 bit). <br>Si noti che correntemente (<a href="http://en.wikipedia.org/wiki/X86-64">http://en.wikipedia.org/wiki/X86-64</a>)
+l'architettura X86-64, che potenzialmente permette di avere
+spazi di indirizzi fisici e virtuali di 2^64 byte, utilizza in realtà
+soltanto
+48 bit, dato che uno spazio di indirizzi fisici o virtuali di 2^48
+bytes (256 Terabytes) è ritenuto più che sufficiente nel prossimo
+futuro, e lo
+spazio "utente" a disposizione dei processi (cioè quello utilizzabile in modalità utente) è "solo" di 2^47 bytes (128
+Terabytes), da 0 a 2^47-1, in esadecimale 0x7FFFFFFFFFFF, in 64 bit:
+diciassette "0" seguiti da quarantasette
+"1".<br><br><img style="width: 960px; height: 720px;" alt="" src="Mem.jpg"><br><br><span style="font-weight: bold;">ESERCIZIO 5.1</span>: e il codice dove sarà? Aggiungere una printf che permetta di scoprirlo.<br><br><br>Per rimuovere un segmento di memoria condivisa si utilizza:<br>
+<br>
+SHMCTL:<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp; int shmctl(int shmid, int cmd, struct shmid_ds
+*buf);<br>
+<br>
+con cmd = IPC_RMID e terzo parametro nullo.<br>
+<br>
+Esiste anche la system call shmdt che "scollega" un segmento dallo
+spazio di indirizzi del processo chiamante.<br>
+<br>***************************************<br><span style="font-family: monospace;"><br></span>L'esempio
+successivo, analogo all'esempio race.c che è relativo alle variabili
+condivise fra thread, mostra che anche per le variabili in memoria
+condivisa c'è il problema delle corse critiche: per valori di k
+sufficientemente grandi la variabile condivisa finisce per avere valori
+anche
+molto diversi dal 10 iniziale.<br><br><pre>::::::::::::::<br>shmrace.c<br>::::::::::::::<br><br>#include &lt;stdio.h&gt;<br>#include &lt;unistd.h&gt;<br>#include &lt;wait.h&gt;<br>#include &lt;stdlib.h&gt;<br>#include &lt;sys/types.h&gt;<br>#include &lt;sys/ipc.h&gt;<br>#include &lt;sys/sem.h&gt;<br>#include &lt;sys/shm.h&gt;<br><br>int main(int argc,char *argv[])<br>{<br>  int j,k,n,shmid,*addr;<br><br>  if (argc != 2) {fprintf(stderr,"Passare un numero come argomento\n");exit(1);}<br>  k = atoi(argv[1]);<br><br>  shmid = shmget(IPC_PRIVATE,sizeof(int),0600);<br>  if (shmid == -1) perror("Creazione memoria condivisa");<br>  addr = (int *) shmat(shmid, NULL, 0);<br>  if (addr == (void *)-1) perror("Attach memoria condivisa");<br>  *addr = 10; /* inizializza il dato condiviso */<br><br>  n= fork();<br>  if (n == -1) perror("Fork");<br><br>  if (n == 0)<br>  {<br>    for (j=0;j&lt;k;j++) (*addr)++;<br>  }<br>  else<br>  {<br>    for (j=0;j&lt;k;j++) (*addr)--;<br><br>    wait(NULL);<br>    printf("Valore numero condiviso: %d\n", *addr);<br>    if (shmctl(shmid,IPC_RMID,0)==-1) perror("Rimozione shm");<br>  }<br>}<br><br>::::::::::::::<br><br></pre><span style="font-weight: bold;">ESERCIZIO
+5.2</span>: se a shmrace si passa un numero molto grande, e prima che il
+programma termini, si dà il segnale di interruzione, il segmento<br>di memoria condivisa rimane allocato, e deve essere rimosso ad esempio con il comando <span style="font-family: monospace;">ipcrm</span>. Modificare il programma in modo che questo non sia necessario.<br></div>
+</body></html>

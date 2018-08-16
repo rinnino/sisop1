@@ -1,0 +1,473 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html><head>
+
+  <title>Appunti Laboratorio Sistemi Operativi: Programmazione Concorrente</title><meta http-equiv="content-type" content="text/html; charset=ISO-8859-1"></head>
+<body><h2>APPUNTI DI&nbsp;SISTEMI OPERATIVI PER LE ESERCITAZIONI IN LABORATORIO</h2>
+<h2 style="text-align: justify;">PARTE 6 -&nbsp; SINCRONIZZAZIONE DI PROCESSI: I SEMAFORI XSI</h2><div style="text-align: justify;"><h4 style="text-align: justify;">*******************************************************</h4>
+
+<h4 style="text-align: justify;">SEMAFORI <br>
+</h4>
+
+<h4 style="text-align: justify;">*******************************************************</h4>
+<div style="text-align: justify;">In questa sezione vedremo i semafori disponibile in Unix come parte dell'estensione XSI, derivanti dalla versione System V.
+Tali semafori sono una versione generalizzata dei semafori proposti in letteratura, nel
+senso che con le chiamate di sistema per operare su di essi si possono:<br>
+</div>
+<ul style="text-align: justify;">
+  <li>riprodurre le operazioni classiche, originariamente chiamate P e
+V da Dijkstra, ridenominate su alcuni testi, fra cui quello di Tanenbaum, "down" e "up", oppure
+"wait" e "signal" (ovviamente in Unix non si possono chiamare
+così, visto che quei nomi sono già usati per altre system calls)</li><li>ma anche effettuare operazioni più generali, come vedremo.
+  </li>
+</ul>
+<div style="text-align: justify;"> <b>***************</b><br>
+<b> &nbsp;CREAZIONE</b><br>
+<b> ***************</b><br>
+<b> </b><br>
+Un primo aspetto importante da tenere presente nell'uso dei semafori (come per le altre
+strutture di Inter Process Communication di XSI, per esempio i segmenti di memoria condivisa) è la natura
+<em>persistente</em> di tali strutture. Come per la memoria condivisa IPC,&nbsp;
+proprio perché servono a più processi, non
+vengono automaticamente deallocate quando termina il processo che ne ha
+richiesto l'allocazione. E devono essere richieste al sistema operativo, nel
+caso dei semafori con la chiamata:<br><br>
+SEMGET:<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp; int semget(key_t key, int nsems, int semflg);<br>
+<br>che restituisce l'identificatore di un vettore di "nsems" semafori
+associati alla chiave "key" (il terzo parametro "semflg" serve per
+diverse opzioni che vedremo in parte in seguito). L'identificatore
+restituito potrà poi essere utilizzato nelle operazioni (tipo
+down e up) illustrate nel seguito.<br>
+<br>La chiave (analogamente a quanto accade nel caso della memoria condivisa),
+serve a fare in modo che i processi di un insieme A, che
+devono sincronizzarsi attraverso uno o più semafori, possano
+acquisire <i>lo stesso semaforo</i>, che verrà effettivamente
+condiviso, mentre un altro insieme B di processi, che devono
+sincronizzarsi tra di loro
+ma non con quelli in A, possa acquisire un semaforo che sia garantito
+essere <i>diverso </i>da quello che usano i processi dell'insieme A.
+La garanzia di ottenere un semaforo diverso serve ad evitare ad esempio
+che una "up" destinata a risvegliare un processo dell'insieme A abbia
+invece l'effetto di risvegliarne uno dell'insieme B.<br>
+<br>Analogamente alla <span style="font-style: italic;">shmget</span>, la <span style="font-style: italic;">semget</span> può quindi essere usata da diversi processi che condividono
+una data chiave <em>mykey</em> con:<br><br>
+semid = semget(mykey, 1, 0600 | IPC_CREAT ) <br>
+<br>oppure da un processo genitore, passando i seguenti parametri:<br><br>
+semid = semget(IPC_PRIVATE, 1, 0600) <br><br>in questo caso tutti i processi discendenti potranno condividere fra loro e con il comune genitore il semaforo identificato da <span style="font-style: italic;">semid</span>.<br>
+<br>
+Il comando <em>ipcs</em> digitato da un terminale, permette di visualizzare
+tutti gli oggetti della categoria IPC presenti nel sistema. <br>
+Per eliminare da shell i semafori creati, non eliminati dai programmi che li hanno utilizzati, ma ritenuti non più utili, si può
+utilizzare il comando ipcrm -s <em>id del semaforo</em>
+
+.<br>
+<b><br>********************************</b><br>
+<b> INIZIALIZZAZIONE E RIMOZIONE</b><br>
+<b> ********************************</b><br>
+<br>
+Varie operazioni su un semaforo (non quelle più significative di
+sincronizzazione) possono essere effettuate con: <br>
+SEMCTL:<br>
+<br>
+&nbsp;&nbsp;&nbsp; int semctl(int semid, int semnum, int cmd, ...);<br>
+<br>
+che segue un'operazione specificata da <span style="font-style: italic;">cmd</span> su <span style="font-style: italic;">semid</span>, o in qualche caso
+sul suo elemento identificato da <span style="font-style: italic;">semnum</span>.<br>
+<br>Le operazioni più rilevanti sono:<br>
+<br>
+cmd = GETVAL : restituisce il valore della componente <span style="font-style: italic;">semnum</span>;<br>
+<br>
+cmd = GETNCNT : restituisce il numero di processi in attesa (con semop,
+si veda più avanti) che il valore della componente <span style="font-style: italic;">semnum</span>
+diventi più grande di quello corrente<br>
+<br>
+cmd = SETVAL : assegna alla componente <span style="font-style: italic;">semnum</span> il valore passato
+nel 4o argomento che è del tipo:<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp; union semun {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; int val;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; struct semid_ds *buf;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ushort *array;<br>
+&nbsp;&nbsp;&nbsp;&nbsp; }<br>
+<br>
+mentre il valore da assegnare deve essere messo nel campo val. A
+seconda delle versioni e opzioni di installazione, questa "union semun"
+può
+dover essere dichiarata esplicitamente.<br>
+<br>
+cmd = IPC_RMID rimuove il vettore di semafori <span style="font-style: italic;">semid</span><br>
+<br>
+Le operazioni GETVAL e SETVAL rendono possibile usare i semafori come
+qualunque
+variabile, infatti permettono di leggerne il valore e modificarlo; tuttavia è raccomandato
+utilizzare SETVAL esclusivamente per inizializzare il valore del semaforo, in
+un
+momento in cui i processi che devono utilizzarlo per
+sincronizzarsi
+non hanno ancora iniziato la loro attività, e successivamente
+utilizzare
+soltanto la semop descritta più avanti (che permette di
+realizzare
+operazioni analoghe a <i>down</i> e <i>up</i>) per operare sugli
+stessi.<br><br>
+<b>************************************************</b><br>
+<b> OPERAZIONI DI SINCRONIZZAZIONE DOWN E UP</b><br>
+<b> ************************************************</b><br>
+<br>
+Lo operazioni di sincronizzazione, incluse down e up, possono essere
+realizzate con la system call:<br>
+<br>
+SEMOP:<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp; int semop(int semid, struct sembuf *sops,
+size_t nsops);<br>
+<br>
+Il tipo struct sembuf include i seguenti campi:
+<pre>	unsigned short sem_num;  /* semaphore number */<br>	short sem_op;            /* semaphore operation */<br>	short sem_flg;           /* operation flags */<br></pre>
+La system call semop esegue sul semaforo <span style="font-style: italic;">semid</span> le <span style="font-style: italic;">nsops</span> operazioni
+contenute nell'array <span style="font-style: italic;">sops</span>.<br>
+Si può dichiarare un vettore:<br>
+<pre>struct sembuf sops[N];</pre>
+riempirlo con la descrizione delle operazioni da fare (per i dettagli
+di come si descrivono, vedere più avanti), e chiamare:<br>
+<pre>semop(semid,sops,N);</pre>
+Oppure, nel caso di una singola operazione (quello più comune)
+si può dichiarare:<br>
+<pre>struct sembuf sb;</pre>
+e chiamare:<br>
+<pre>semop(semid,&amp;sb,1);</pre>
+Ogni elemento dell'array sops specifica una operazione, ogni operazione
+ha 3 campi:<br>
+<br>
+sem_num: numero della componente del vettore di semafori su cui
+operare;<br>
+sem_op: operazione da fare (vedi sotto);<br>
+sem_flg: opzioni<br>
+<br>
+Con valori diversi di sem_op, in particolare 1 e -1, si possono
+realizzare come si vedrà più avanti la <i>up </i>e la <i>down</i>,
+ma in generale il comportamento è il seguente:<br>
+</div>
+<ul style="text-align: justify;">
+  <li>se sem_op &gt; 0, il valore del semaforo è incrementato di
+sem_op;</li>
+  <li>se sem_op &lt; 0, allora :</li>
+  <ul>
+    <li>&nbsp; se |sem_op| &lt;= valore semaforo, il valore del
+semaforo viene decrementato di |sem_op|;</li>
+    <li>&nbsp; se |sem_op| &gt; valore semaforo, allora se sem_flg
+&amp; IPC_NOWAIT è vero si ritorna subito, altrimenti il
+processo viene sospeso fino a che si verifica una delle seguenti
+condizioni:</li>
+  </ul>
+  <ul>
+    <ul>
+      <li>in conseguenza dell'aumento del valore del semaforo si ha
+|sem_op| &lt;= valore semaforo , nel qual caso il valore del semaforo
+viene decrementato di |sem_op|;</li>
+      <li>il vettore di semafori semid viene rimosso (quindi attenzione
+a non rimuovere semafori che sono utilizzati da qualche processo, se
+non nel caso in cui ci si accorga che il normale lavoro dei processi
+che
+li usano per sincronizzarsi non può più proseguire);</li>
+      <li>il processo riceve un segnale da "catturare" (ha associato
+alla ricezione del segnale una funzione da eseguire);</li>
+    </ul>
+  </ul>
+  <li>se sem_op = 0, il processo viene sospeso in attesa che il
+valore del semaforo diventi zero (si esce subito se lo è
+già)</li>
+</ul>
+<div style="text-align: justify;"> I seguenti sono esempi di
+realizzazione delle operazioni <i>up</i> e <i>down</i> "classiche"
+sui semafori mediante i semafori Unix (insieme ad una funzione da
+utilizzare per l'inizializzazione di un semaforo).<br>
+Per <i>up </i>e <i>down </i>si usano i valori 1 e -1 per sem_op. <br>
+Se il semaforo vale 0 e vi sono diversi processi sospesi in attesa di
+completare una <i>down</i> (operazione con sem_op=-1), viene
+risvegliato uno solo di essi; in questo modo il valore del semaforo non
+diventa mai
+negativo. Successive&nbsp;<i>up</i> risveglieranno gli altri.
+Può
+darsi che una specifica implementazione risvegli questi processi
+nell'ordine
+in cui sono stati sospesi (First In First Out), ma non vi è
+alcuna
+garanzia che lo stesso avvenga in una diversa versione di Unix.<br>
+<pre>::::::::::::::<br>semfun.h<br>::::::::::::::<br>int down(int semid, int semnum);<br>	/* operazione DOWN sulla componente semnum di semid */<br><br>int up(int semid, int semnum);<br>	/* operazione UP sulla componente semnum di semid */<br><br>int seminit(int semid, int semnum, int initval);<br>	/* inizializzazione con initval della componente semnum di semid */<br><br>::::::::::::::<br>semfun.c<br>::::::::::::::<br>#include &lt;sys/types.h&gt;<br>#include &lt;sys/ipc.h&gt;<br>#include &lt;sys/sem.h&gt;<br>#include &lt;stdio.h&gt;<br><br>int down(int semid, int semnum)	<br>	/* operazione DOWN sulla componente semnum di semid */<br>{<br>  int r;<br>  struct sembuf sb;<br><br>  sb.sem_num=semnum;<br>  sb.sem_op=-1;<br>  sb.sem_flg=0;<br>  r=semop(semid,&amp;sb,1);<br>  if (r==-1) perror("semop in down");<br>  return r;<br>}<br><br>int up(int semid, int semnum)	<br>	 /* operazione UP sulla componente semnum di semid */<br>{<br>  int r;<br>  struct sembuf sb;<br><br>  sb.sem_num=semnum;<br>  sb.sem_op=1;<br>  sb.sem_flg=0;<br>  r=semop(semid,&amp;sb,1);<br>  if (r==-1) perror("semop in up");<br>  return r;<br>}<br><br>int seminit(int semid, int semnum, int initval)<br>	/* inizializzazione con initval della componente semnum di semid */<br>{<br>  int r;<br>  union semun<br>  {<br>    int val;<br>    struct semid_ds *buf;<br>    unsigned short *array;<br>  } arg;<br>  arg.val=initval;<br>  r=semctl(semid,semnum,SETVAL,arg);<br>  if (r==-1) perror("semop in up");<br>  return r;<br>}<br>::::::::::::::<br></pre>
+Nel seguente esempio un processo alloca e inizializza un semaforo, poi
+genera un processo figlio; i due processi usano il semaforo per
+sincronizzarsi, in particolare il padre aspetta una operazione UP del
+figlio.<br>
+<pre>::::::::::::::<br>sem.c<br>::::::::::::::<br>#include "semfun.h"<br><br>#include &lt;stdio.h&gt;<br>#include &lt;sys/types.h&gt;<br>#include &lt;sys/ipc.h&gt;<br>#include &lt;sys/sem.h&gt;<br><br>int main()<br>{<br>  int semid,val,n;<br><br>  semid = semget(IPC_PRIVATE,1,0600);<br>  if (semid == -1) perror("Creazione semaforo");<br>  printf("Identificatore semaforo: %d\n",semid);<br>  seminit(semid,0,0);<br>  val = semctl(semid,0,GETVAL);<br>  if (val==-1) perror("Lettura valore semaforo");<br>  printf("Valore semaforo %d: %d\n",semid,val);<br>  n= fork();<br>  if (n == -1) perror("Fork");<br><br>  if (n == 0)<br>  {<br>    sleep(3);<br>    printf("Do via libera\n");<br>    up(semid,0); <br>  }<br>  else<br>  {<br>    down(semid,0); <br>    printf("Ricevuto via libera\n");<br>    sleep(3);<br>    if (semctl(semid,0,IPC_RMID)==-1) perror("Rimozione semaforo");<br>  }<br>}<br>::::::::::::::<br><br></pre>
+</div>
+In generale prima della rimozione bisognerebbe attendere la
+terminazione degli altri processi che possono operare sul semaforo; in
+questo caso particolare la segnalazione up(semid,0) da parte del figlio
+serve in pratica anche come segnalazione della sua terminazione.<br>
+Si noti che (scorrettamente) non si va a verificare il risultato di up
+e down (che per come sono definite è il risultato delle system
+calls semop chiamate al loro interno). Utilizzi "seri" di questa system
+call dovrebbero tener conto, in particolare, del fatto che una semop
+sospensiva può terminare non perché è stata fatta
+una up, ma perché il processo ha ricevuto un segnale, o il
+semaforo è
+ stato rimosso (vedere come al solito il man e i testi di
+riferimento).<br>
+<br>
+ESERCIZIO 6.1:&nbsp; modificare i due rami dei due processi in modo da
+garantire l'esecuzione in mutua esclusione di una sezione del loro
+codice, che simula una "regione critica" (per il momento fittizia dato
+che in questo esempio non abbiamo memoria condivisa), ad esempio una
+sequenza:<br>
+<br>
+- stampa "inizio regione critica del processo getpid()"<br>
+- sleep(5)<br>
+- stampa "fine regione critica del processo getpid()"<br>
+<br>
+preceduta e seguita dalle opportune operazioni sui semafori, in
+modo tale che sia garantito che un processo entri nella regione critica
+solo quando l'altro la abbandona. Si noti che al fine di non diminuire
+il potenziale parallelismo dei processi che si sincronizzano, è
+in generale opportuno che <span style="font-weight: bold;">la durata
+delle sezioni critiche</span>,
+durante le
+quali viene detenuto da un processo (posto che il codice degli altri
+processi usi lo stesso sistema)&nbsp; il diritto di accesso esclusivo a
+dati
+condivisi, <span style="font-weight: bold;">sia la più breve
+possibile</span>. In particolare, operazioni
+che comportano la sospensione del processo dovrebbero comportare il
+rilascio
+della mutua esclusione. In questo esempio artificiale vogliamo
+però
+soltanto verificare il meccanismo di sincronizzazione; l'attesa di 5
+secondi
+all'interno della sezione critica ha il solo scopo di rendere
+percepibili,
+durante l'esecuzione, la durata delle sezioni (fittiziamente) critiche, distaccando
+opportunamente
+i conseguenti eventi di "inizio" e "fine" per i due processi.<br>
+NB può darsi che al primo tentativo di realizzazione di questo
+esercizio, entrambi i processi si blocchino all'inizio della sezione
+critica. Come va inizializzato il semaforo in questo caso?<br><br>
+ESERCIZIO 6.2: modificare il programma "shmrace.c" che presentava il
+problema delle corse critiche, utilizzando i semafori per evitare il
+problema.<br>Per valori alti del numero di iterazioni, si può notare che c'è un prezzo da pagare in efficienza.<br>
+<div style="text-align: justify;"> <br>
+<b> **************************************************************</b><br>
+<br>
+Nella descrizione della system call <i>semop </i>non si fa menzione
+sull'ordine in cui diversi processi sospesi su uno stesso semaforo
+vengono risvegliati. Il seguente esempio può servire a
+verificare, almeno per curiosità, quale sia il
+meccanismo implementato in una specifica realizzazione della chiamata
+di sistema. Infatti vengono generati, a distanza di 1 secondo l'uno
+dall'altro, 5 processi che vanno a fare <i>down</i>&nbsp;su un semaforo "rosso". Poi il genitore effettua, sempre
+a
+distanza di un 1 secondo l'una dall'altra, 5 chiamate di <i>up</i>. <br>
+Anche se non si devono fare assunzioni sulla velocità dei
+processi, in un sistema scarico (senza altri processi sottoposti dall'utente) il
+tempo di 1 secondo tra un evento e l'altro è enormemente
+maggiore del tempo reale necessario per far arrivare i processi alle
+chiamate di <i>down</i> e quindi si può effettivamente supporre
+che queste chiamate avvengano nell'ordine, prima da parte del processo
+con i=0, poi da parte di quello con i=1, eccetera.
+Le printf (a patto che non interferisca la bufferizzazione dell'output)
+possono fornire una conferma, e in ogni caso volendo essere più
+sicuri si può aumentare il parametro passato a sleep, o
+sostituire la chiamata con il for (di opportuna lunghezza a seconda
+della velocità della CPU) messo come commento.<br>
+In ogni caso, anche se verifichiamo che l'implementazione di semop che
+stiamo utilizzando sembra risvegliare i processi nell'ordine in cui
+sono stati sospesi, non si potrebbe concludere che sia sempre
+così, <i>e in ogni caso </i>non bisogna scrivere programmi che
+si basino su questa ipotesi, perché in una diversa versione del
+sistema potrebbero non funzionare. Se ci interessa assicurare che lo
+scheduling di diversi processi
+in attesa di un evento segua una certa politica (FIFO o altre), bisogna
+utilizzare
+i cosiddetti <i>semafori privati</i> , come visto nel corso.<br>
+<pre>::::::::::::::<br>codasem.c<br>::::::::::::::<br>#include "semfun.h"<br><br>#include &lt;stdio.h&gt;<br>#include &lt;signal.h&gt;<br>#include &lt;sys/types.h&gt;<br>#include &lt;sys/ipc.h&gt;<br>#include &lt;sys/sem.h&gt;<br>#include &lt;sys/shm.h&gt;<br>#include &lt;errno.h&gt;<br>#include &lt;unistd.h&gt;<br>#include &lt;sys/wait.h&gt;<br>#include &lt;unistd.h&gt;<br>#include &lt;stdlib.h&gt;<br><br>/* verifica gestione coda semafori */<br><br>int semid;<br><br>void proc(i)<br>int i;<br>{<br>  printf("Processo %d con pid %d prima della down\n",i,getpid());<br>  down(semid,0);<br>  printf("Processo %d con pid %d dopo la down\n",i,getpid());<br>}<br><br>int main()<br>{<br>int i,j;<br>pid_t pid;<br><br> <br>if ((semid = semget(IPC_PRIVATE,1,0666))==-1)<br>     perror("semget");<br><br>seminit(semid,0,0);	 /* setta "rosso" */<br><br>for(i=0;i&lt;5;i++)<br>	 {<br>	if (fork()==0)<br>		{ proc(i); exit(1);}<br>	 sleep(1);<br>	 /*for(j=0;j&lt;10000000;j++);*/<br>	}<br>for(i=0;i&lt;5;i++) <br>	{<br>	up(semid,0);<br>	 sleep(1);<br>	}<br>for(i=0;i&lt;5;i++)<br>	{ pid=wait(0);<br>	  printf("Terminato processo %d\n",pid);<br>	}<br>if (semctl(semid,0,IPC_RMID) == -1)<br>     perror("semctl");<br>}<br>::::::::::::::<br></pre>
+<br>
+<br>
+<b>**************************************************************</b><br>
+<b> USO DI SEMOP PER OPERAZIONI PIU GENERALI DI DOWN E UP</b><br>
+<b> **************************************************************</b><br>
+<b> </b><br>
+Un <b>primo </b>tipo di operazione più generale delle down e
+up "classiche" che si può realizzare con semop consiste nell'uso
+nel campo sem_op di valori positivi e negativi con valore assoluto
+diverso da 1.<br>
+Questo può servire con un semaforo "a contatore", inizializzato
+ad un numero N di "gettoni" (es. corrispondente ad un numero di risorse
+uniformi di cui richiedere l'utilizzo in mutua esclusione); una
+operazione in cui il campo sem_op ha un valore negativo "-k"
+corrisponde al tentativo di prendere in un solo colpo k gettoni
+(risorse), infatti comporta il tentativo di decrementare di k il valore
+del semaforo, che tuttavia non viene effettuato se il valore risultante
+del semaforo dovesse risultare negativo; in questo caso il processo
+viene sospeso.<br>
+Si noti che questa operazione è diversa da una sequenza di k
+operazioni <i>down, </i>perché nel caso il valore <i>s </i>del
+semaforo sia strettamente compreso fra 0 e k (es. k=5 e s=2), con le k
+operazioni down in sequenza, le prime <i>s </i>hanno successo (le
+prime
+2 nell'esempio) decrementando il valore del semaforo fino a zero, e il
+processo
+si sospende sulla successiva (la terza nell'esempio); invece con una
+singola
+operazione con sem_op=k, il valore del semaforo rimane invariato,
+lasciando
+la possibilità ad un altro processo di effettuare operazioni con
+sem_op negativo e |sem_op| &lt;= s.<br>
+<br>
+Una operazione con sem_op=k (positivo) corrisponde al rilascio di k
+gettoni (risorse).<br>
+Nel caso in cui vi siano diversi processi sospesi in attesa di
+completare una operazione con sem_op negativo, e il valore del semaforo
+venga incrementato (non necessariamente di 1), viene portato a termine
+(risvegliando i processi corrispondenti) un insieme di operazioni
+completando le quali il valore del semaforo rimane non negativo. <br>
+Più esattamente, un insieme "massimale" di operazioni che abbia
+la proprietà precedente, cioè un insieme di operazioni tale che le
+operazioni in esso possono essere tutte completate, ma una volta
+completate quelle, nessuna
+delle operazioni rimaste in sospeso può essere completata
+senza rendere il semaforo negativo.<br>
+Ad esempio, se il valore del semaforo è 0, e vi sono 3 processi
+p1, p2 e p3, sospesi in attesa di completare operazioni sul semaforo
+con valore di sem_op di -2, -4 e -2 rispettivamente, se il semaforo
+viene incrementato di 4 (operazione con sem_op=4) potrebbero essere
+risvegliati alternativamente:<br>
+</div>
+<ul style="text-align: justify;">
+  <li>p1 e p3; oppure:</li>
+  <li>p2<br>
+  </li>
+</ul>
+<div style="text-align: justify;"> indipendentemente dall'ordine in cui
+i processi sono stati sospesi. Una specifica implementazione
+probabilmente scorrerà la lista
+di processi sospesi sul semaforo (lista in cui <i>può darsi</i>
+che i processi siano stati deliberatamente tenuti nell'ordine in cui si
+sono sospesi) effettuando per ciascuno l'operazione sospesa, se ora
+è possibile completarla. Una tale implementazione nell'esempio
+risveglierebbe:<br>
+</div>
+<ul style="text-align: justify;">
+  <li>p2 solo se è il primo dei 3 ad essere preso in
+considerazione;</li>
+  <li>p1 e p3 altrimenti<br>
+  </li>
+</ul>
+<div style="text-align: justify;"> <br>
+<b> **************************************************************</b><br>
+<b> </b><br>
+Un <b>secondo </b>tipo di operazione diversa da down e up riguarda
+l'attesa del valore zero.<br>
+Come si è visto una chiamata di semop con valore di sem_op = 0
+fa sospendere i processi se il semaforo non vale zero (fino a quando
+il valore diventa zero); questo è l'uso opposto al "normale",
+non va assolutamente mescolato con operazioni la cui logica segue
+quella di <i>down </i>e <i>up </i>(eventualmente generalizzate come
+già visto).<br>
+Può essere utile per realizzare un meccanismo chiamato
+"barriera" (es. sul testo di Tanenbaum), in cui abbiamo N processi il
+cui codice prevede una prima sezione (es. di inizializzazione) e una
+seconda sezione (in cui ad esempio i processi devono interagire per una
+elaborazione comune), e vogliamo che tutte le prime sezioni siano
+eseguite prima di tutte le seconde sezioni, cioè che i processi
+arrivati al termine della prima sezione proseguano solo dopo che anche
+gli altri vi sono arrivati. <br>
+Questo tipo di sincronizzazione può essere realizzato sfruttando
+il caso sem_op=0 come nel seguente esempio, inizializzando il semaforo
+a N e facendo chiamare ad ogni processo al termine della prima sezione
+una down (che però non è usata con la logica delle <i>down
+</i>e <i>up </i>classiche) seguita da una operazione (che chiameremo
+"waitz")
+di attesa del valore zero.<br>
+Le varie down hanno in questo caso solo l'effetto di decrementare il
+valore del semaforo e non sono mai sospensive; quando l'ultimo processo
+P arriva alla down, il valore diventa zero, gli altri processi in
+attesa sulla "waitz" vengono sbloccati, e P stesso, alla successiva
+chiamata di waitz, non viene sospeso ma prosegue. In questo modo tutti
+i processi accedono alla seconda sezione.<br>
+Le sleep(i) eseguite da ogni processo fanno in modo da distanziare il
+tempo reale di arrivo al termine della prima sezione da parte dei
+diversi processi.<br>
+<pre>::::::::::::::<br>semz.c<br>::::::::::::::<br>#include "semfun.h"<br><br>#include &lt;stdio.h&gt;<br>#include &lt;sys/types.h&gt;<br>#include &lt;sys/ipc.h&gt;<br>#include &lt;sys/sem.h&gt;<br>#include &lt;sys/wait.h&gt;<br>#include &lt;unistd.h&gt;<br>#include &lt;stdlib.h&gt;<br><br>#define N 5<br><br>int semid;<br><br>int waitz(int semid, int semnum)<br>        /* attesa del valore zero sulla componente semnum di semid */<br>{<br>  struct sembuf sb;<br><br>  sb.sem_num=semnum;<br>  sb.sem_op=0;<br>  sb.sem_flg=0;<br>  return semop(semid,&amp;sb,1);<br>}<br><br>void proc(int i)<br>{ <br>  sleep(i);<br>  printf("Processo %d con pid %d al termine della prima sezione\n",i,getpid());<br>  down(semid,0);<br>  waitz(semid,0);<br>  printf("Processo %d con pid %d all'inizio della seconda sezione\n",i,getpid());<br>}<br><br>int main()<br>{<br>  int val,pid,i;<br><br>  semid = semget(IPC_PRIVATE,1,0600);<br>  printf("Valore semid: %d\n",semid);<br>  if (semid == -1) perror("Creazione semaforo");<br>  seminit(semid,0,N);<br>  val = semctl(semid,0,GETVAL);<br>  if (val==-1) perror("Lettura valore semaforo");<br>  printf("Valore semaforo %d: %d\n",semid,val);<br><br>  for(i=0;i&lt;N;i++)<br>        if (fork()==0)<br>                { proc(i); exit(0);};<br>  for(i=0;i&lt;N;i++)<br>        { pid=wait(0);<br>          printf("Terminato processo %d\n",pid);<br>        }<br>  if (semctl(semid,0,IPC_RMID)==-1) perror("Rimozione semaforo");<br>}<br>::::::::::::::<br></pre>
+<b>**************************************************************</b><br>
+<b> </b><br>
+Un <b>terzo </b>senso in cui semop è più generale di
+down e up consiste nel fatto, che finora abbiamo soltanto menzionato,
+che a semop si può passare un <i>vettore </i>di operazioni su
+elementi (tipicamente diversi) dello stesso vettore di semafori.<br>
+In questo caso, come si può leggere nel man, semop effettua le
+operazioni in modo "atomico" cioè indivisibile. Vale a dire, se
+almeno una delle operazioni non può essere portata a termine
+(es. operazione con campo sem_op negativo, con valore assoluto maggiore
+di quello del semaforo), il processo (a meno che non venga richiesto
+diversamente attraverso i flag delle operazioni) viene sospeso e non
+viene effettuata nessuna delle operazioni descritte nel vettore passato
+a semop. Le operazioni verranno effettuate tutte insieme soltanto in un
+momento successivo,
+quando i valori dei semafori saranno tali da rendere possibili tutte
+le operazioni.<br>
+<br>
+</div><br><div style="text-align: justify;"><b>******************************</b><br>
+<b> ESEMPIO: I 5 FILOSOFI</b><br>
+<b> ******************************</b><br>
+<br>
+Il seguente esempio realizza la simulazione del problema dei "5
+filosofi" soggetta a <i>deadlock</i>, in quanto vengono utilizzati 5
+semafori per l'allocazione in mutua esclusione delle risorse
+(forchette) e il processo (filosofo) <i>i </i>acquisisce le 2 risorse
+con due operazioni <i>down </i>sui semafori <i>i </i>e <i>(i+1)%5.</i><br>
+<i> </i><br>
+<i> </i>Il fatto che la soluzione sia soggetta a <i>deadlock </i>non
+significa che questo effettivamente si verifichi, l'evento dipende
+anche dallo scheduling della CPU (che pur non essendo affatto
+programmato per evitare il deadlock, determina l'effettivo avanzamento
+dei processi), e dagli altri eventi che occorrono nel sistema operativo
+nel momento in cui il programma gira.<br>
+<br>
+Questo esempio utilizza la memoria condivisa, ma solo per tenere
+traccia dello stato dei filosofi per visualizzarlo all'utente; tale
+stato non è usato esplicitamente per concedere o meno
+l'allocazione delle risorse, che dipende invece dallo stato dei
+semafori: un processo ottiene l'allocazione delle forchette superando
+le due <span style="font-style: italic;">down</span>.<br>
+<pre>::::::::::::::<br>filodead.c<br>::::::::::::::<br>#include "semfun.h"<br><br>#include &lt;stdio.h&gt;<br>#include &lt;stdlib.h&gt;<br>#include &lt;signal.h&gt;<br>#include &lt;sys/types.h&gt;<br>#include &lt;sys/ipc.h&gt;<br>#include &lt;sys/sem.h&gt;<br>#include &lt;sys/shm.h&gt;<br>#include &lt;sys/wait.h&gt;<br>#include &lt;unistd.h&gt;<br>#include &lt;stdlib.h&gt;<br><br>/* 5 filosofi con possibile deadlock */<br><br>int semid,shmid;<br>char *stato; /* puntera' ad un array di 5 caratteri in <br>	        memoria condivisa che serve solo per illustrare<br>		 all'utente lo stato dei 5 filosofi, <br>		T=thinking, H=hungry, E=eating */<br><br>void cleanup(int sig)<br>{<br>  if (semctl(semid,0,IPC_RMID) == -1)<br>     perror("semctl");<br>  if (shmctl(shmid,IPC_RMID,0) == -1)<br>     perror("semctl");<br>  exit(sig);<br>}<br><br>void print()	/* stampa lo stato dei filosofi */ <br>{<br>  int i;<br>  for(i=0;i&lt;5;i++) putchar(stato[i]);<br>  printf("\n");<br>}<br><br>void proc(int i)<br>{<br>  int j,n;<br>  int m;<br><br>  m = 50000000 + 30000000 * i; /* tempo per cui usera' le forchette; <br>	i filosofi con i piu' alto sono piu' lenti a mangiare, questo differenzia<br>	un pochino il loro comportamento e su qualche sistema favorisce <br>	il verificarsi del deadlock */<br><br>  for (n=0;n&lt;50;n++)<br>  {<br>    stato[i]='H';<br>    printf("FILOSOFO %d PRENDE LA %d  ",i,i);<br>    print();<br>    down(semid,i);<br>    down(semid,(i+1)%5);<br>    stato[i]='E';<br>    printf("FILOSOFO %d MANGIA       ",i);<br>    print();<br>    for(j=0;j&lt;m;j++); /* ogni processo usa le risorse per un tempo diverso */<br>    stato[i]='T';<br>    printf("FILOSOFO %d SMETTE       ",i);<br>    print();<br>    up(semid,(i+1)%5);<br>    up(semid,i);<br>  }<br>}<br><br>int main()<br>{<br>  int i,j;<br>  pid_t pid;<br>  struct sigaction sa;<br><br>  if ((semid = semget(IPC_PRIVATE,5,0600))==-1)<br>     perror("semget");<br>  if ((shmid = shmget(IPC_PRIVATE,5,0600))==-1)<br>     perror("shmget");<br>  stato = (char *) shmat(shmid,0,0);<br>  if ((int)stato == -1) perror("shmat");<br>  for (i=0;i&lt;5;i++)<br>  {<br>    stato[i]='T';<br>    seminit(semid,i,1);<br>  }<br><br>  for(i=0;i&lt;5;i++)<br>	{<br>	if (fork()==0)<br>		{ proc(i); exit(0);}<br>	}<br><br>  sa.sa_handler = cleanup;<br>  sigaction(SIGINT,&amp;sa,NULL);<br>     /* se vanno in deadlock, bisogna interrompere tutto,<br>	 il processo padre associa cleanup a SIGINT per rimuovere <br>	semafori e memoria condivisa in questo caso */<br><br>  for(i=0;i&lt;5;i++)<br>	{ <br>	  pid=wait(0);<br>	  printf("Terminato processo %d\n",pid);<br>	}<br>  cleanup(0);<br><br>}<br>::::::::::::::<br><br></pre>
+ESERCIZIO 6.3: sfruttando il fatto che a <i>semop </i>si può
+passare un <i>vettore </i>di operazioni su elementi dello stesso
+vettore di semafori, operazioni che vengono effettuate in modo
+indivisibile, modificare la soluzione precedente in modo che non sia
+soggetta a <i>deadlock</i>.<br>
+</div>
+<h4 style="text-align: justify;"><b>************************************************<br>
+ESEMPIO: PRODUTTORI E CONSUMATORI<br>
+************************************************</b><br>
+</h4>
+<div style="text-align: justify;"> Questo esempio utilizza in modo
+più essenziale la memoria condivisa per far condividere un
+"buffer" di caratteri a processi "produttori" e "consumatori" che,
+rispettivamente, depositano e prelevano i caratteri.<br>
+Nell'esempio specifico, il programma principale fa partire un certo
+numero di processi produttori, che producono ripetutamente sempre uno
+stesso
+carattere (diverso a seconda del processo), e un unico processo
+consumatore,
+che estrae i caratteri dal buffer e li scrive su un file, il cui nome
+deve
+essere passato come argomento al comando (es. generare l'eseguibile
+"prodcons" e chiamare "prodcons pippo"). Sullo standard output viene
+stampato (per avere una traccia) il contenuto del buffer dopo ogni
+operazione.<br>
+In questo caso particolare, dopo che i processi produttori sono
+terminati, il processo padre scrive un carattere convenzionale nel
+buffer che viene interpretato dal processo consumatore come "fine dati".<br>
+<pre><br>::::::::::::::<br>prodcons.c<br>::::::::::::::<br><br>/********  N produttori, 1 consumatore con processi e semafori ********/<br><br>#include "semfun.h"<br><br>#include &lt;stdio.h&gt;<br>#include &lt;signal.h&gt;<br>#include &lt;sys/types.h&gt;<br>#include &lt;sys/ipc.h&gt;<br>#include &lt;sys/sem.h&gt;<br>#include &lt;sys/shm.h&gt;<br>#include &lt;sys/wait.h&gt;<br>#include &lt;unistd.h&gt;<br>#include &lt;stdlib.h&gt;<br><br>#define N 5    		 /* dim. buffer */<br>#define NPROD 5    	/* numero produttori */<br>#define NGIRI 20 	/* quanti caratteri prodotti da ogni produttore */<br><br>struct buffer{<br>        char pool[N];<br>        int in,out,count;<br>        } *buf;		/* puntatore al buffer che viene allocato <br>			   in memoria condivisa */<br><br>int shmid,mutex,empty,full;<br><br>void printstatus()	/* stampa contenuto del buffer */<br>{<br>  int i;<br> <br>  printf("Contenuto del buffer:");<br>  for (i=0;i&lt;buf-&gt;count;i++)<br>      putchar(buf-&gt;pool[(buf-&gt;out+i)%N]);<br>}<br><br>void put(char i)<br>{<br> <br>  buf-&gt;pool[buf-&gt;in]=i;<br>  buf-&gt;in = (buf-&gt;in+1)%N;<br>  buf-&gt;count++;<br> <br>  printstatus();<br>  printf(" dopo put del carattere %c\n",i);<br>  fflush(stdout); /* cosi' va bene anche se si ridirige l'output su disco */<br>}<br><br>void get(char *ip)<br>{<br><br>  *ip=buf-&gt;pool[buf-&gt;out];<br>  buf-&gt;out = (buf-&gt;out+1)%N;<br>  buf-&gt;count--;<br>  <br>  printstatus();<br>  printf(" dopo get del carattere %c\n",*ip);<br>  fflush(stdout); /* cosi' va bene anche se si ridirige l'output su disco */<br>}<br> <br><br>void producer(char c)	/* produce NGIRI volte il carattere c */<br>{<br>  int i;<br> <br>  for (i=0;i&lt;NGIRI;i++)<br>        {<br> <br>	int j;<br>        for (j=0;j&lt;10000000;j++); /* per rallentare */<br><br>	down(empty,0);<br>        down(mutex,0);<br>        put(c);<br>        up(mutex,0);<br>	up(full,0);<br>        }<br>}<br><br>void consumer(char *filename)	/* copia da buffer a filename */<br>{<br>  char c;<br>  FILE *res;<br> <br>  res=fopen(filename,"w");<br><br>  do /* esce quando trova il carattere \0 nel buffer */<br>  {<br>  	int i;<br> <br>  	for (i=0;i&lt;10000000;i++); /* per rallentare */<br> <br>  	down(full,0);<br>  	down(mutex,0);<br>  	 get(&amp;c);<br>  	up(mutex,0);<br>  	 up(empty,0);<br>	<br>  	putc(c,res);<br>  }<br>  while (c!=0);<br>}<br> <br><br>void clear(int s)	/* rimuove strutture IPC */<br>{<br><br>if (semctl(mutex,0,IPC_RMID) == -1) perror("semctl");<br>if (semctl(full,0,IPC_RMID) == -1) perror("semctl");<br>if (semctl(empty,0,IPC_RMID) == -1) perror("semctl");<br>if (shmctl(shmid,IPC_RMID,0) == -1) perror("shmctl");<br>exit(s);<br>}<br> <br>int main(int argc, char *argv[])<br>{<br><br>int i,pid;<br>struct sigaction sa;<br><br>if (argc != 2) <br>{<br>	fprintf(stderr,"un nome di file come argomento\n");<br>	 exit(1);<br>}<br><br>if ((mutex = semget(IPC_PRIVATE,1,0666))==-1)<br>     perror("semget");<br>seminit(mutex,0,1);<br><br>if ((empty = semget(IPC_PRIVATE,1,0666))==-1)<br>     perror("semget");<br>seminit(empty,0,N);<br> <br>if ((full = semget(IPC_PRIVATE,1,0666))==-1)<br>     perror("semget");<br>seminit(full,0,0);<br> <br> <br>/* acquisisce memoria condivisa per il buffer */<br> <br>if ((shmid = shmget(IPC_PRIVATE,sizeof(struct buffer),0666))==-1)<br>     perror("shmget");<br>buf = (struct buffer *) shmat(shmid,0,0);<br>if ((int) buf == -1) perror("shmat");<br> <br> sa.sa_handler = clear;<br>sigaction(SIGINT,&amp;sa,NULL);<br><br>/* inizializza buffer */<br> <br>buf-&gt;in = buf-&gt;out = buf-&gt;count = 0;<br> <br>/* genera produttori e consumatore */<br><br> <br>fflush(stdout);<br><br><br>for(i=0;i&lt;NPROD;i++)<br>	{<br>	if (fork()==0)<br>		{ producer('0'+i); exit(0);}<br>	}<br>if (fork()==0)<br>	{ consumer(argv[1]); exit(0);}<br><br><br>for(i=0;i&lt;NPROD;i++)<br>	{ pid=wait(NULL);<br>	  printf("Terminato processo %d\n",pid);<br>	}<br><br>/* produce carattere 0 per far terminare il consumatore */<br>down(empty,0);<br>down(mutex,0);<br>put(0);<br>up(mutex,0);<br>up(full,0);<br><br>wait(NULL);<br>clear(0);<br>}<br>::::::::::::::<br></pre>
+<b></b>
+</div></div></body></html>

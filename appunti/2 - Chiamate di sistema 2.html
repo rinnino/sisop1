@@ -1,0 +1,282 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html><head>
+  
+  <title>Appunti Laboratorio Sistemi Operativi, Parte 2</title><meta http-equiv="content-type" content="text/html; charset=ISO-8859-1"></head>
+<body>
+
+<h2>APPUNTI DI SISTEMI OPERATIVI PER LE ESERCITAZIONI IN LABORATORIO</h2><h2>
+CHIAMATE DI SISTEMA - PARTE 2</h2><h4>****************************************</h4>
+<h4>SYSTEM CALLS PER GESTIONE PROCESSI</h4>
+<h4>****************************************</h4>
+La chiamata di sistema:<br>
+<br>
+FORK:<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp; pid_t fork(void);<br>
+<br>
+crea un nuovo processo (figlio) identico al processo chiamante (padre).
+Entrambi i processi proseguono eseguendo il codice del processo che ha
+effettuato la chiamata di fork() e si trovano all'uscita della chiamata
+di questa
+funzione, con la differenza che al nuovo processo viene restituito 0,
+al
+padre l'identificatore del processo figlio.<br>
+Il tipo pid_t, definito in un opportuno file header da includere
+(vedasi man fork) nasconde l'effettivo tipo numerico (es. int)
+utilizzato in ogni specifica versione del sistema Unix per
+rappresentare gli identificatori di processo.<br>
+<br>
+GETPID, GETPPPID:<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp; pid_t getpid(void);<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp; pid_t getppid(void);<br>
+<br>
+restituiscono l'identificatore del processo corrente (quello che
+effettua la chiamata) e del processo
+'padre' di quello corrente.<br>
+<br>
+Un esempio "minimale" di uso della fork consiste in una banale
+"clonazione" del processo:<br>
+<pre>::::::::::::::<br>clona.c<br>::::::::::::::</pre>
+<pre>int main()<br>{<br>  fork();<br>  printf("Hello World\n");<br>}<br>::::::::::::::</pre>
+Come tutte le chiamate di sistema, fork() restituisce -1 in caso di
+errore e quindi è opportuno verificare se si tratta di questo
+caso.<br>
+Inoltre, il risultato di fork può essere utilizzato per far
+eseguire parti diverse dello stesso codice al processo padre e al
+processo figlio, come nel seguente esempio, in cui due processi girano
+in pseudoparallelo (su una macchina con un solo processore single-core)
+o effettivamente in parallelo:<br>
+<pre>::::::::::::::<br>par.c<br>::::::::::::::<br>#include &lt;sys/types.h&gt;<br>#include &lt;unistd.h&gt;<br>#include &lt;stdio.h&gt;<br>#include &lt;stdlib.h&gt;<br><br>int main()<br>{<br><br>  int i,j;<br>  pid_t n;<br><br>  n=fork();<br>  if (n==(pid_t)-1)<br>	{perror("fork fallita");<br>	 exit(1);<br>	};<br>  if (n==(pid_t)0) {<br>      for (j=0;j&lt;50;j++) {<br>        for (i=0; i&lt; 100000000; i++);<br>        printf("     Figlio %d \n",j);<br>      }<br>  }<br>  else {<br>      for (j=0;j&lt;50;j++) {<br>        for (i=0; i&lt; 100000000; i++);<br>        printf("Padre %d\n",j);<br>      }<br>  }<br>}<br>::::::::::::::<br></pre>
+In questo esempio vediamo l'utilizzo del tipo pid_t per il valore
+restituito da fork: nei confronti fra tale valore e le costanti -1 e 0,
+tali costanti sono convertite in pid_t per garantire il corretto esito
+del confronto,
+facendo sì che i due numeri da confrontare siano rappresentati
+con
+lo stesso numero di bit.<br>
+<br>
+Ogni volta che il programma viene fatto girare, le stampe "Padre" e
+"Figlio" a video possono alternarsi in modo diverso.<br>
+Il numero medio di stampe consecutive da parte dello stesso processo
+dipende dal fatto che i processi girino effettivamente in parallelo o
+no, e nel secondo caso dalla velocità del processore, in particolare da
+quanto
+tempo di CPU è necessario per eseguire il ciclo:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; for (i=0; i&lt; 100000000;
+i++);<br>
+che viene eseguito fra una stampa e l'altra.<br>
+Su un' altra macchina, es. se con un solo processore single-core, si possono ottenere risultati diversi.<br><br>
+ESERCIZIO 2.1:&nbsp;<br>Rendere il programma più generale facendo
+in modo che i due numeri (nell'esempio 50 e 10000000) da usare come
+lunghezza dei due cicli vengano passati come argomenti. <br>Eseguire il programma ridirigendo l'output su file, es.
+chiamando "par arg1 arg2&nbsp; &gt; pippo" se "par"
+è il nome
+dell'eseguibile.<br>
+L'alternanza delle stringhe stampate dai due processi è diversa rispetto
+al caso di output su video? Perché?<br>
+Da questo si dovrebbe imparare che se abbiamo una applicazione
+costituita
+da diversi processi e vogliamo, attraverso stampe su uno stesso file,
+avere
+una traccia fedele degli eventi occorsi nei processi, è
+necessario
+adottare delle precauzioni.<br>
+<br>
+Nel seguente esempio vengono utilizzati e stampati in vario modo gli
+identificatori dei processi:<br>
+<pre>::::::::::::::<br>creaproc.c<br>::::::::::::::<br>#include &lt;sys/types.h&gt;<br>#include &lt;unistd.h&gt;<br>#include &lt;stdio.h&gt;<br>int main()<br>{ <br>  pid_t n;<br>  if((n=fork())== (pid_t)-1)<br>	{perror("fork fallita");<br>	 exit(1);<br>	}<br><br>  else if (n==(pid_t)0)<br>		{/* processo figlio */<br>		 printf("Il risultato di fork() nel figlio e' %d\n",n);<br>		 printf("Il pid del figlio e' %d\n",getpid());<br>		 printf("Il pid del padre visto dal figlio e' %d\n",getppid());<br>		}<br>       else<br>		{/* processo padre */<br>		 printf("Il risultato di fork() nel padre e' %d\n",n);<br>		 printf("Il pid del padre e' %d\n",getpid());<br>		}<br>}<br>::::::::::::::</pre>
+ESERCIZIO 2.2:<br>
+Provare ad aggiungere nel processo figlio una chiamata sleep(n) (attesa per
+n secondi) in modo che il processo padre termini prima del momento in
+cui il processo figlio chiama getppid() per conoscere l'identificatore
+del
+processo padre.<br>
+Si può verificare che quando il padre termina, il figlio viene
+'adottato' da un processo di sistema che ha pid=1.<br><span style="font-weight: bold;">
+Si noti</span> che "sleep" non è certo un buon modo per sincronizzare i
+processi in modo tale che uno arrivi ad un punto del suo programma dopo
+che un altro è arrivato ad un altro punto del proprio. In
+seguito
+si vedranno i meccanismi generali per fare questo.<br>
+<br>
+Se si esegue un ciclo infinito <br>
+<pre>&nbsp;&nbsp;&nbsp; while(1);</pre>
+nel processo figlio dopo le stampe, con il comando ps nella finestra da
+cui è stato chiamato l'eseguibile si può vedere il
+processo
+(figlio) con il suo identificatore nell'elenco dei processi; lo si
+può
+terminare con il comando:<br>
+<pre>kill pid</pre>
+che invia al processo un "segnale" che - per default - ne causa la
+terminazione (per&nbsp;i segnali si veda più avanti).<br>
+<br>
+*********************************************************<br>
+<br>
+Tipicamente il processo padre attende la terminazione dei figli con:<br>
+<br>
+WAIT:<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp; pid_t wait(int *stat_loc);<br>
+<br>
+La chiamata di wait - semplificandone la descrizione - sospende il
+chiamante fino a che UNO dei figli
+termina, e restituisce il pid del processo terminato.<br>
+Se il puntatore passato come argomento non è zero, l'intero
+puntato viene valorizzato con informazioni sul modo di terminazione del
+&nbsp;processo, compattate nei bit che costituiscono l'intero: <br>
+<ul>
+  <li>se il processo termina con exit, gli 8 bit meno significativi del
+valore passato a exit vengono inseriti nell'intero spostati di 8 bit a
+sinistra;&nbsp;</li>
+  <li>se é stato terminato da un "segnale", l'intero identifica
+il tipo del segnale, aumentato di 128 se é stato salvato un file
+"core" come avviene per alcuni tipi di segnali. Il file "core" contiene
+l'immagine di memoria del processo al momento della terminazione e
+può essere utilizzato in un debugger qualora la terminazione
+sia, per l'utente, inattesa e si ritenga sia stata causata dal processo
+stesso che ha ricevuto il segnale dal sistema operativo come risposta
+al tentativo di operare ad es. su un
+indirizzo non ammesso</li>
+</ul>Esistono (vedere il man di wait) delle macro che permettono di estrarre da tale
+valore intero le informazioni codificate dalla wait, senza <br>doversi
+ricordare come sono codificate (ad es. WIFEXITED è vera se il processo è terminato di sua iniziativa).<br>Le informazioni vengono (per default) mantenute nella tabella dei processi dopo
+la terminazione del processo, ma una volta lette da wait, l'elemento
+della tabella dei processi viene (per default) liberato.&nbsp;<br><br>Esiste anche una variante di wait: <br><br>
+WAITPID:<br>
+<br>&nbsp;&nbsp;&nbsp; &nbsp;pid_t waitpid(pid_t pid, int *status, int options);<br><br>più flessibile della wait
+(vedere di nuovo il man), che permette di attendere (come da nome) anche solo un processo con un
+dato identificatore; inoltre permette di uscire anche quando il processo&nbsp;viene
+"fermato" (<span style="font-style: italic;">stopped</span>, che differisce dal terminare perché un processo fermato può essere
+fatto ripartire), e di non sospendersi ma verificare soltanto se è terminato un processo figlio.<br>
+<br>
+ESERCIZIO 2.3: inserire nel programma precedente l'attesa del figlio da
+parte del padre, e a verificare con WIFEXITED nei vari casi,  incluso quello in cui il figlio esegue un ciclo infinito e viene
+ucciso
+con kill, se il processo è terminato di sua iniziativa.<br>NB in questo caso fintanto che il processo padre attende il
+figlio,
+non viene restituito il controllo all'interprete dei comandi che gira
+nella
+finestra da cui abbiamo lanciato l'eseguibile (infatti il processo
+"padre"
+è a sua volta "figlio" del processo che esegue l'interprete e
+sta
+attendendo la terminazione dell'ultimo comando lanciato, prima di
+andare
+a leggere il comando successivo). Quindi è necessario eseguire
+il
+comando kill da un'altra finestra. <br><br>ESERCIZIO 2.4: modificare uno degli esempi precedenti, aggiungendo una
+variabile che permetta di verificare che processo padre e figlio hanno
+due copie delle variabili: il figlio eredita i valori precedenti alla
+fork, ma le modifiche successive (visualizzate con delle printf) nei
+due processi sono indipendenti. <br>
+<br>
+*********************************************************<br>
+<br>
+GENERAZIONE DI PIÚ PROCESSI:<br>
+<br>
+La fork può essere usata all'interno di programmi costruiti a
+piacimento anche con le strutture di controllo if, for, while etc, ad
+esempio
+per generare un certo numero di processi uniformi. In progammi del
+genere
+bisogna tuttavia fare attenzione all'effettivo ramo del programma in
+cui
+prosegue l'esecuzione di ciascun processo.<br>
+<br>
+Ad esempio nel seguente programma vengono generati 5 processi figli che
+vanno ad eseguire una stessa funzione con valori diversi del parametro:<br>
+<pre>::::::::::::::<br>5figli.c<br>::::::::::::::<br>#include &lt;stdio.h&gt;<br>#include &lt;signal.h&gt;<br>#include &lt;sys/types.h&gt;<br>#include &lt;unistd.h&gt;<br>#include &lt;sys/wait.h&gt;<br><br>void proc(int i)<br>{ int n;<br><br>  printf("Processo %d con pid %d\n",i,getpid());<br>  for (n=0;n&lt;500000000;n++);<br>}<br><br>int main()<br>{<br>int i;<br>pid_t pid;<br><br>for(i=0;i&lt;5;i++)<br>	if (fork()==0)<br>		{ proc(i); exit(0);};<br>for(i=0;i&lt;5;i++)<br>	{ pid=wait(0);<br>	  printf("Terminato processo %d\n",pid);<br>	}<br>}<br></pre>
+<pre>::::::::::::::<br></pre>
+ESERCIZIO 2.5: che cosa succederebbe se non ci fosse la exit nel codice
+eseguito
+dai processi figli? Provare a rispondere, poi rimuovere la exit, far
+eseguire
+il programma e spiegare il risultato. Fra l'altro, si noti che in
+questo
+programma, molto imprudentemente, <i>non </i>si
+verifica se le
+chiamate di
+sistema - e in particolare la wait - comportano errori, motivo per cui
+otteniamo cose prive di senso come "Terminato processo -1".<br>
+<br>
+<br>
+*********************************************************<br>
+<br>
+FORK ED EXEC<br>
+<br>
+L'uso tipico di fork è in combinazione con una delle funzioni
+della famiglia exec come le seguenti:<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp; int execl(const char *path, const char *arg0,
+...,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; const char
+*argn, char * /*NULL*/);<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp; int execv(const char *path, char *const
+argv[]);<br>
+<br>
+che effettuano tutte la chiamata di sistema execve (per altre varianti
+vedi
+man exec).<br>
+L'effetto di una exec è il seguente: il processo va ad eseguire
+il programma contenuto nel file (eseguibile) contenuto nel file
+identificato dall'argomento "path",&nbsp; (con gli argomenti passati
+come ulteriori parametri; execl è per il caso in cui il numero
+di argomenti è fissato: come ultimo argomento si passa NULL; a
+execv si passa invece un vettore di argomenti).<br>
+Il processo (in particolare l'identificatore del processo) rimane lo
+stesso, ma quasi tutta l'immagine del processo (il codice e i dati)
+cambia.<br>
+NB come tutte le chiamate di sistema, ci sono dei casi di errore per le
+exec, ad esempio, il file indicato non viene trovato (dove? vedasi
+più avanti le varianti execlp e execvp). Se però ci sono
+le condizioni affinché abbia successo, una volta che è
+completata la transizione e il processo è passato ad eseguire il
+nuovo programma, non c'è più nessuna relazione tra il
+processo e il programma che stava eseguendo prima (quello contenente la
+chiamata di exec).<br>
+<br>
+Questo esempio illustra un semplice uso di execl; il secondo programma
+va
+ovviamente compilato in un file eseguibile "hello". Provare però
+ad eseguire provaexec sia prima di aver generato "hello", sia dopo.<br>
+<pre>::::::::::::::<br>provaexec.c<br>::::::::::::::<br>#include &lt;sys/types.h&gt;<br>#include &lt;unistd.h&gt;<br>#include &lt;stdio.h&gt;<br>#include &lt;sys/wait.h&gt;<br>int main()<br>{ <br>  pid_t n;<br>  int s;<br>  if((n=fork())== (pid_t)-1)<br>	{perror("fork fallita");<br>	 exit(1);<br>	}<br>  else if (n==(pid_t)0)<br>		{/* processo figlio */<br>		execl("hello","hello",NULL);<br>		perror("exec fallita");<br>		}<br>       else<br>		{/* processo padre */<br>		wait(&amp;s);<br>		}<br>}<br>::::::::::::::<br>hello.c<br>::::::::::::::<br>int main()<br>{<br>  printf("Hello \n");<br>}<br>::::::::::::::<br><br></pre>
+Per fare exec di un comando che non si trova nella directory corrente,
+se non si vuole dare il pathname completo ma si vuole che il comando
+venga cercato nella lista di pathnames mantenuta dalla shell (in modo
+analogo a
+come i comandi si usano dalla shell: si dà semplicemente "ls" e
+non
+"/usr/bin/ls") bisogna usare le varianti execlp e execvp.<br>
+<br>
+ESERCIZIO 2.6: modificare il programma precedente con
+execl("ls","ls",NULL); verificare che la exec fallisce, modificarlo in
+modo che funzioni.<br>
+<br>
+ESERCIZIO 2.7: verificare i comportamenti indesiderati che si possono
+ottenere se si fa una stampa con printf che NON causa lo svuotamento
+del
+buffer e poi:<br>
+2.7.1) si chiama fork, oppure:<br>
+2.7.2) si chiama exec<br>
+e spiegare perché.<br>
+Suggerimento: per 2.7.1 usare come punto di partenza creaproc.c; se si
+usa provaexec.c, essendoci sia fork che exec, a seconda di dove
+é
+piazzata la printf è possibile non notare alcun effetto. Per
+2.7.2
+usare provaexec.c.<br>
+<br>
+Si può ricavare come suggerimento: usare sempre le funzioni di
+libreria, perchè sono più comode delle system calls e ne
+fanno un uso efficiente; ma prima di una fork o di una exec chiamare
+fflush per i files su cui si &nbsp;è scritto.<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+</body></html>

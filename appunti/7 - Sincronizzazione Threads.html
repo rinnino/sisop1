@@ -1,0 +1,164 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html><head>
+
+
+<meta content="text/html; charset=ISO-8859-1" http-equiv="content-type"><title>Appunti sistemi Operativi</title></head><body><h2>APPUNTI DI SISTEMI OPERATIVI PER LE ESERCITAZIONI IN LABORATORIO</h2>
+<h2 style="text-align: justify;">PARTE 7 -&nbsp; SINCRONIZZAZIONE FRA
+THREADS<br>
+
+</h2><h4 style="text-align: justify;">*******************************************************</h4><h4 style="text-align: justify;"><b>SINCRONIZZAZIONE FRA THREADS</b>
+</h4>
+
+<h4 style="text-align: justify;">*******************************************************</h4><br>
+Per la sincronizzazione fra threads di uno stesso processo ci sono a
+disposizione diversi meccanismi, fra cui:<br>
+<ul><li>semafori</li><li>"mutex" e variabili condizione</li></ul>
+<b>************<br>
+SEMAFORI<br>
+************<br><br></b>
+I semafori definiti nello standard POSIX
+(1003.1-2013) sono utili anche per sincronizzare i "pthreads".
+Sono più semplici da utilizzare e tipicamente più veloci rispetto ai semafori XSI vista in precedenza. Esistono
+due versioni:<br>
+<ul>
+  <li>&nbsp;I <em>named semaphores </em>possono essere usati da tutti i&nbsp; processi&nbsp; che conoscono il nome identificatore.</li>
+  <li>&nbsp;Gli <em>unnamed semaphores</em> possono essere usati solo
+da threads nello stesso processo, a meno che il semaforo non sia
+collocato in una regione di memoria condivisa tra i processi.<br>
+  </li>
+</ul>
+&nbsp;Noi&nbsp; prenderemo in considerazione solo i secondi che saranno
+applicati per&nbsp; sincronizzazione&nbsp; threads di uno stesso
+processo.<br>
+<br>
+<br>
+********************************<br>
+INIZIALIZZAZIONE E RIMOZIONE<br>
+********************************<br>
+<br>
+Un semaforo si dichiara con: <br>
+<pre>	sem_t s;</pre>
+(tipo definito in semaphore.h); si inizializza con
+<pre>	sem_init(&amp;s,0,val);<br></pre>
+dove "val" è il valore a cui viene inizializzato; il secondo
+parametro 0 serve ad indicare che il semaforo può essere usato
+solo dai threads del processo che l'ha creato.<br>
+<br>
+Una volta che abbiamo terminato di usare il semaforo, possiamo eliminarlo con:&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;  &nbsp;&nbsp;  <br>
+<pre>	sem_destroy(&amp;s);</pre>ma comunque, come per tutte le
+variabili dichiarate in un programma, alla terminazione del processo un
+tale semaforo non rimane allocato. <br>
+<br>
+************************************************<br>
+OPERAZIONI DI SINCRONIZZAZIONE DOWN E UP<br>
+************************************************<br>
+<br>
+L'equivalente della funzione "up" è <br>
+<pre>	sem_post(&amp;s);<br></pre>
+e l'equivalente della "down" è
+<pre>	sem_wait(&amp;s);<br><br></pre>
+La funzione sem_wait&nbsp; ritorna subito se è possbile decrementare il
+semaforo (il valore del semaforo è &gt;0) altrimenti viene sospeso
+finchè:<br>
+<ul>
+  <li>il valore del semaforo viene incrementato, oppure</li>
+  <li>il processo viene interrotto da un segnale.  <br>
+  </li>
+</ul>
+
+Il programma&nbsp; <span style="font-family: monospace; font-style: italic;"></span><span style="font-style: italic;">coda_sem_thr.c </span>è
+simile a quello visto in precedenza per i semafori XSI. Vengono
+generati 5 threads, a distanza di&nbsp; 1 secondo l'uno dall'altro, che si mettono
+in attesa sul semaforo <span style="font-style: italic;">sem.&nbsp;</span>
+Successivamente, sempre a distanza di 1 secondo, vengono eseguite 5 <span style="font-style: italic;">sem_post</span>.
+Il programma permette di mettere in evidenza (senza alcuna certezza) quale politica
+viene adottata per gestione della coda nei semafori.&nbsp;
+<pre>::::::::::::::<br>coda_sem_thr.c<br>::::::::::::::<br><br>#include &lt;stdlib.h&gt;<br>#include &lt;stdio.h&gt;<br>#include &lt;semaphore.h&gt;<br>#include &lt;pthread.h&gt;<br><br>#include &lt;unistd.h&gt;<br>#include &lt;stdlib.h&gt;<br><br>/* verifica gestione coda semafori */<br><br>sem_t sem; /* creo semaforo posix*/<br><br><br>void *tf(void *p)<br>{<br>  <br>  printf("Thread %d prima della sem_wait\n",*(int *)p);<br>  sem_wait(&amp;sem);<br>  printf("Thread %d dopo la sem_wait\n",*(int *)p);<br>}<br><br>int main()<br>{<br>int i,j;<br>pid_t pid;<br>pthread_t t[5];<br><br><br>/* inizializzo semaforo sem a 0 (setta "rosso") */<br>if(sem_init(&amp;sem,0,0)==-1) {perror("sem_init"); exit(0);} <br><br><br>for(i=0;i&lt;5;i++)<br>	 { pthread_create(&amp;t[i], NULL, tf, (void *)&amp;i);sleep(1);}<br><br>for(i=0;i&lt;5;i++) <br>	{sem_post(&amp;sem);<br>	sleep(1);<br>	}<br>for(i=0;i&lt;5;i++)<br>	{ pthread_join(t[i], NULL);<br>	  printf("Terminato thread %d\n",i);<br>	}<br>sem_destroy(&amp;sem);	<br>}<br><br>::::::::::::::<br><br></pre>
+ESERCIZIO 7.1: modificare il programma "race.c" (visto nella terza
+parte degli appunti) che presentava il problema delle corse critiche,
+utilizzando i semafori POSIX per evitare il problema.<br>
+<br>
+<br>
+************************************************<br>
+ESEMPIO: PRODUTTORI E CONSUMATORI<br>
+************************************************<br>
+Il seguente esempio mostra la sincronizzazione di produttori e
+consumatori. L'mplementazione è simile a quella presentata con i semafori
+XSI con la differenza che vengono usati&nbsp; thread, piuttosto che
+processi, per riempire e leggere il buffer e vengono usate le&nbsp;
+chiamate <span style="font-style: italic;">sem_post </span>e <span style="font-style: italic;">sem_wait</span> per la loro sincronizzazione.<br>
+<br>
+<pre>::::::::::::::</pre>
+<pre>pc_sem_thr.c</pre>
+<pre>::::::::::::::</pre>
+<pre><br>/********  N produttori, 1 consumatore con semafori e thread ********/<br><br>#include &lt;stdio.h&gt;<br>#include &lt;stdlib.h&gt;<br>#include &lt;pthread.h&gt;<br>#include &lt;semaphore.h&gt;<br><br>#define N 5    		/* dim. buffer */<br>#define NPROD 5    	/* numero produttori */<br>#define NGIRI 20 	/* quanti caratteri prodotti da ogni produttore */<br><br>struct buffer{<br>        char pool[N];<br>        int in,out,count;<br>        } buf;<br><br>sem_t mutex,empty,full;<br><br><br>void printstatus()	/* stampa contenuto del buffer */<br>{<br>  int i;<br> <br>  printf("Contenuto del buffer:");<br>  for (i=0;i&lt;buf.count;i++)<br>      putchar(buf.pool[(buf.out+i)%N]);<br>}<br><br>void put(char i)<br>{<br> <br>  buf.pool[buf.in]=i;<br>  buf.in = (buf.in+1)%N;<br>  buf.count++;<br> <br>  printstatus();<br>  printf(" dopo put del carattere %c\n",i);<br>  fflush(stdout); /* cosi' va bene anche se si ridirige l'output su disco */<br>}<br><br>void get(char *ip)<br>{<br><br>  *ip=buf.pool[buf.out];<br>  buf.out = (buf.out+1)%N;<br>  buf.count--;<br>  <br>  printstatus();<br>  printf(" dopo get del carattere %c\n",*ip);<br>  fflush(stdout); /* cosi' va bene anche se si ridirige l'output su disco */<br>}<br> <br><br>void *producer(void *p)	/* produce NGIRI volte il carattere *p */<br>{<br>  int i;<br><br>  for (i=0;i&lt;NGIRI;i++)<br>        {<br> <br>	int j;<br>        for (j=0;j&lt;1000000;j++); /* per rallentare */<br><br>	sem_wait(&amp;empty);<br>        sem_wait(&amp;mutex);<br>        put(*(char *)p);<br>        sem_post(&amp;mutex);<br>	sem_post(&amp;full);<br>        }<br>}<br><br>void *consumer(void *filename)	/* copia da buffer a filename */<br>{<br>  char c;<br>  FILE *res;<br> <br>  res=fopen((char *)filename,"w");<br><br>  do /* esce quando trova il carattere \0 nel buffer */<br>  {<br>  	int i;<br> <br>  	for (i=0;i&lt;1000000;i++); /* per rallentare */<br> <br>  	sem_wait(&amp;full);<br>  	sem_wait(&amp;mutex);<br>  	get(&amp;c);<br>  	sem_post(&amp;mutex);<br>  	sem_post(&amp;empty);<br>	<br>  	putc(c,res);<br>  }<br>  while (c!=0);<br>}<br><br> <br>int main(int argc, char *argv[])<br>{<br><br>int i;<br>char c[NPROD];<br>pthread_t t[NPROD+1];<br><br>sem_init(&amp;mutex,0,1);<br><br>sem_init(&amp;empty,0,N);<br><br>sem_init(&amp;full,0,0);<br><br><br>if (argc != 2) <br>{<br>	fprintf(stderr,"un nome di file come argomento\n");<br>	exit(1);<br>}<br><br>buf.in = buf.out = buf.count = 0;<br> <br>/* genera produttori e consumatore */<br><br>fflush(stdout);<br><br><br>for(i=0;i&lt;NPROD;i++)<br>	{<br>	  c[i]='0'+i;<br>	  pthread_create(&amp;t[i], NULL, producer, &amp;c[i]);<br>	}<br><br>pthread_create(&amp;t[i], NULL, consumer, argv[1]);<br><br>for(i=0;i&lt;NPROD;i++)<br>	pthread_join(t[i], NULL);<br><br>/* produce carattere 0 per far terminare il consumatore */<br>sem_wait(&amp;empty);<br>sem_wait(&amp;mutex);<br>put(0);<br>sem_post(&amp;mutex);<br>sem_post(&amp;full);<br><br>pthread_join(t[i],NULL);<br><br>}<br><br>::::::::::::::<br><br></pre>
+
+
+<br>
+
+<b>***********************<br>
+MUTEX E CONDIZIONI<br>
+***********************</b><br>
+I threads possono essere sincronizzati anche con i "mutex" e le
+variabili condizione,&nbsp;derivate da quelle dei "monitor" per la programmazione concorrente.<br>
+<br>
+Un "mutex" è la forma semplificata di semaforo sufficiente
+a gestire la mutua esclusione: il "lock" di un "mutex" serve a prendere
+la mutua esclusione per l'accesso a delle variabili condivise,
+l'"unlock"
+per rilasciarla.<br>
+<br>
+Un mutex si dichiara con
+<pre>	pthread_mutex_t m;<br></pre>
+si inizializza con
+<pre>	pthread_mutex_init(&amp;m,NULL)<br></pre>
+(NULL fa sì che il mutex abbia gli attributi di default).<br>
+Le operazioni di lock e unlock sono:
+<pre>	pthread_mutex_lock(&amp;m);<br>	pthread_mutex_unlock(&amp;m);<br></pre>
+Le variabili condizione si utilizzano per sincronizzazioni
+"asimmetriche" in cui un thread segnala un evento di cui altri thread
+possono essere in attesa.<br>
+Tipicamente questo evento riguarda lo stato di variabil condivise, per
+cui le condizioni si usano in combinazione con i mutex.<br>
+<br>
+Una variabile condizione si dichiara con<br>
+<pre>	pthread_cond_t cond;<br></pre>
+si inizializza con
+<pre>	pthread_cond_init(&amp;cond,NULL)<br><br></pre>
+(NULL fa sì che la condizione abbia gli attributi di default).<br>
+<br>
+Un thread, tipicamente dopo avere conquistato l'accesso esclusivo
+a variabili condivise con
+<pre>	pthread_mutex_lock(&amp;m);<br></pre>
+può sospendersi in attesa di "cond" con:<br>
+<pre>	pthread_cond_wait(&amp;cond,&amp;m);<br></pre>
+questo comporta anche l'unlock di m, cioè il rilascio della
+mutua esclusione (e il nuovo lock di m quando il thread verrà
+sbloccato).<br>
+Un thread può "segnalare" una condizione con:<br>
+<pre>	pthread_cond_signal(&amp;cond);	<br></pre>
+che risveglia uno dei threads bloccati su cond (se non ce ne sono, non
+ha effetto).<br>
+Esiste anche una
+<pre>	pthread_cond_broadcast(&amp;cond);<br><br></pre>
+che risveglia tutti i threads bloccati sulla condizione.<br>
+Tipicamente, la segnalazione viene fatta da un thread che opera sulle
+stesse variabili condivise e quindi ha il lock sul mutex che il
+processo bloccato ha indicato come secondo parametro della propria
+"wait" (anzi
+è raccomandato che questo avvenga sempre e non solo
+"tipicamente",
+per evitare il problema della "perdita della segnalazione".<br>
+Il thread sbloccato, o i thread sbloccati in caso di "broadcast",
+potrà (potranno) riprendere il lock (uno per volta) quando il
+processo
+segnalante lo rilascerà. <br>
+<br>ESERCIZIO 7.2: modificare il programma "race.c" che presentava il
+problema delle corse critiche, utilizzando i mutex per evitare il
+problema.<br>Confrontare il prezzo da pagare in efficienza con quello degli esercizi 6.2 e 7.1.<br>
+<h4><b>************************************************<br>
+ESEMPIO: PRODUTTORI E CONSUMATORI<br>
+************************************************</b></h4>
+Il seguente esempo illustra la realizzazione della sincronizzazione
+di produttori e consumatori&nbsp; come nell'esempio precedente, ma con mutex e condizioni.<br><br>
+<pre>::::::::::::::<br>pc_cond_thr.c<br>::::::::::::::<br><br><br>/********  N produttori, 1 consumatore con condizioni e thread ********/<br><br>#include &lt;stdio.h&gt;<br>#include &lt;stdlib.h&gt;<br>#include &lt;semaphore.h&gt;<br>#include &lt;pthread.h&gt;<br><br>#define N 5    		/* dim. buffer */<br>#define NPROD 5    	/* numero produttori */<br>#define NGIRI 20 	/* quanti caratteri prodotti da ogni produttore */<br><br>struct buffer{<br>        char pool[N];<br>        int in,out,count;<br>        } buf;<br><br>pthread_mutex_t m;<br>pthread_cond_t empty,full;<br><br><br>void printstatus()	/* stampa contenuto del buffer */<br>{<br>  int i;<br> <br>  printf("Contenuto del buffer:");<br>  for (i=0;i&lt;buf.count;i++)<br>      putchar(buf.pool[(buf.out+i)%N]);<br>}<br><br>void put(char i)<br>{<br> <br>  buf.pool[buf.in]=i;<br>  buf.in = ((buf.in)+1)%N;<br>  buf.count++;<br> <br>  printstatus();<br>  printf(" dopo put del carattere %c\n",i);<br>  fflush(stdout); /* cosi' va bene anche se si ridirige l'output su disco */<br>}<br><br>void get(char *ip)<br>{<br><br>  *ip=buf.pool[buf.out];<br>  buf.out = ((buf.out)+1)%N;<br>  buf.count--;<br>  <br>  printstatus();<br>  printf(" dopo get del carattere %c\n",*ip);<br>  fflush(stdout); /* cosi' va bene anche se si ridirige l'output su disco */<br>}<br> <br><br>void *producer(void *p)	/* produce NGIRI volte il carattere *p */<br>{<br>  int i;<br><br>  for (i=0;i&lt;NGIRI;i++)<br>        {<br> <br>	int j;<br>        for (j=0;j&lt;1000000;j++); /* per rallentare */<br><br>	pthread_mutex_lock(&amp;m);<br>	while (buf.count==N) pthread_cond_wait(&amp;empty,&amp;m);<br>        put(*(char *)p);<br>	pthread_cond_signal(&amp;full);<br>	pthread_mutex_unlock(&amp;m);<br>        }<br>}<br><br>void *consumer(void *filename)	/* copia da buffer a filename */<br>{<br>  char c;<br>  FILE *res;<br> <br>  res=fopen((char *) filename,"w");<br><br>  do /* esce quando trova il carattere \0 nel buffer */<br>  {<br>  	int i;<br> <br>  	for (i=0;i&lt;1000000;i++); /* per rallentare */<br> <br>	pthread_mutex_lock(&amp;m);<br>	while (buf.count==0) pthread_cond_wait(&amp;full,&amp;m);<br>  	get(&amp;c);<br>	pthread_cond_signal(&amp;empty);<br>	pthread_mutex_unlock(&amp;m);<br>	<br>  	putc(c,res);<br>  }<br>  while (c!=0);<br>}<br><br> <br>int main(int argc, char *argv[])<br>{<br><br>int i;<br>char c[NPROD];<br>pthread_t t[NPROD+1];<br><br>pthread_mutex_init(&amp;m,NULL);<br><br>pthread_cond_init(&amp;empty,NULL);<br><br>pthread_cond_init(&amp;full,NULL);<br><br>if (argc != 2) <br>{<br>	fprintf(stderr,"un nome di file come argomento\n");<br>	exit(1);<br>}<br><br>buf.in = buf.out = buf.count = 0;<br><br>/* genera produttori e consumatore */<br><br>fflush(stdout);<br><br><br>for(i=0;i&lt;NPROD;i++)<br>	{<br>	  c[i]='0'+i;<br>	  pthread_create(&amp;t[i], NULL, producer, &amp;c[i]);<br>	}<br><br>pthread_create(&amp;t[i], NULL, consumer, argv[1]);<br><br>for(i=0;i&lt;NPROD;i++)<br>	pthread_join(t[i], NULL);<br><br>/* produce carattere 0 per far terminare il consumatore */<br><br>pthread_mutex_lock(&amp;m);<br>while (buf.count==N) pthread_cond_wait(&amp;empty,&amp;m);<br>put((char)0);<br>pthread_cond_signal(&amp;full);<br>pthread_mutex_unlock(&amp;m);<br><br>pthread_join(t[i],NULL);<br><br>}<br><br><br></pre></body></html>
