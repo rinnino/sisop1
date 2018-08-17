@@ -45,6 +45,7 @@ int main(int argc, char **argv)
     sigemptyset(&sa.sa_mask);     // setta a "insieme vuoto" sa.sa_mask maschera di segnali da bloccare 
     sa.sa_flags = SA_RESTART;     // restart system calls  if interrupted
     sigaction(SIGUSR1,&sa,NULL);  // handler per USR1
+    sigaction(SIGUSR2,&sa,NULL);  // handler per USR2
 
     if(argc!= 3)
     {

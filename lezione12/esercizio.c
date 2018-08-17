@@ -1,18 +1,14 @@
+#define _GNU_SOURCE
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
 #include <signal.h>
+#include <assert.h>
+#include <sys/types.h>
+#include <unistd.h>
 
-#define HEAP_LIMIT 1000000
-
-//variabili globali
-heap h; // un nuovo heap
-
-//prototipi
-int heap_init(heap *h, int maxSize);
-int allocate_memory(heap *h, int size);
-int free_mem(heap *h, int size);
+#define HEAP_LIMIT 100
 
 //struttura dati heap
 typedef struct {
@@ -20,6 +16,20 @@ typedef struct {
   pthread_cond_t cond;    // condition variable
   pthread_mutex_t mutex;  // mutex associato alla condition variable
 } heap;
+
+//variabili globali
+heap h; // un nuovo heap
+
+//struttura dati argomento per i thread
+typedef struct{
+    int mem, sec;
+} threadArg;
+
+//prototipi
+int heap_init(heap *h, int maxSize);
+int allocate_memory(heap *h, int size);
+int free_mem(heap *h, int size);
+void *tbody(void *arg);
 
 //heap_init inizializza la struct heap e deve essere chiamata
 //una volta sola. maxSize è la quantità di meoria assegnata all'heap.
@@ -37,14 +47,17 @@ int heap_init(heap *h, int maxSize){
 //non davvero ma solo simula, così tanto per fare esercizio
 int allocate_memory(heap *h, int size){
     int e;
+    if(size > HEAP_LIMIT){
+        return -1;
+    }
     e = pthread_mutex_lock(&h->mutex);
     if(e!=0) return e;
-    while(h->bytesLeft < size){
-        e = pthread_cond_wait(&h->cond, &h->mutex);
+    while(h->bytesLeft < size){ //mentre non ho abbastanza spazio libero ...
+        e = pthread_cond_wait(&h->cond, &h->mutex); //attendiamo si liberi spazio
         if(e!=0) return e;
     }
     h->bytesLeft -= size;
-    printf("sto allocando %d bytes ti memoria, ne rimangono ancora %d disponibili", size, h->bytesLeft);
+    printf("sto allocando %d bytes di memoria, ne rimangono ancora %d disponibili\n", size, h->bytesLeft);
     e = pthread_mutex_unlock(&h->mutex);
     if(e!=0) return e;
     return 0;
@@ -91,32 +104,84 @@ int free_mem(heap *h, int size){
 // quando gli altri thread non liberano sufficiente memoria.
 
 
+
+void handler(int s)
+{
+    int e;
+    pthread_t nuovoThread;
+    threadArg a;
+    printf("Segnale %d ricevuto dal processo %d\n", s, getpid());
+
+    if(s==SIGUSR1) {
+        //  ogni volta che viene inviato il segnale USR1 il programma deve 
+        //  chiedere (usando printf/scanf) due interi mem e sec e lancia un
+        //  nuovo thread che alloca mem byte di memoria dall'heap condiviso,
+        //  attende per sec secondi con una sleep, dealloca i mem byte e termina.
+        printf("Quanti byte allocare ? ");
+        e = scanf("%d", &a.mem);
+        assert(e>=0);
+        printf("\nQuanti secondi di durata ? ");
+        e = scanf("%d", &a.sec);
+        assert(e>=0);
+        //lancia il thread
+        e = pthread_create(&nuovoThread, NULL, tbody, &a);
+        assert(e==0);
+        return;
+    }else if(s==SIGUSR2){
+        //  ogni volta che viene inviato il segnale USR2 il programma deve 
+        //  visualizzare la quantità di memoria dell'heap attualmente
+        //  disponibile.
+
+        //h è condiviso, quindi regione critica
+        pthread_mutex_lock(&h.mutex);
+        printf("Memoria disponibile nell'heap: %d\n", h.bytesLeft);
+        pthread_mutex_unlock(&h.mutex);
+    } 
+}
+
 //  ogni volta che viene inviato il segnale USR1 il programma deve 
 //  chiedere (usando printf/scanf) due interi mem e sec e lancia un
 //  nuovo thread che alloca mem byte di memoria dall'heap condiviso,
 //  attende per sec secondi con una sleep, dealloca i mem byte e termina.
-void handler(int s)
-{
-    int mem, sec, e;
-    printf("Segnale %d ricevuto dal processo %d\n", s, getpid());
-    if(s==SIGUSR1) {
-    // dopo aver fatto girare il programma la prima volta
-    // s-commentate l'istruzione kill e osservate cosa succede
-    //kill(getpid(),SIGUSR1);
-    printf("Quanti byte allocare ? ");
-    scanf(&mem);
-    printf("\nQuanti secondi di durata ? ");
-    scanf(&sec);
-
-    e = allocate_memory(&h, mem); //alloca mem byte
-    if(e!=0) return e;
-    sleep(sec); //esegui sec secondi
-    e= free_mem(&h, mem);
-    if(e!=0) return e;
-  } 
+void *tbody(void *arg){
+    int e;
+    threadArg *a = (threadArg *)arg;
+    e = allocate_memory(&h, a->mem); //alloca mem byte
+    if(e == -1){
+        //tentativo di allocare piu memoria di quella disponibile
+        printf("Errore, tentativo di allocare %d bytes, ma solo %d disponibili\n", a->mem, h.bytesLeft);
+        pthread_exit(NULL);
+    }
+    printf("[thread]Ho allocato %d nella heap\n", a->mem);
+    assert(e==0);
+    printf("[thread]Vado a dormire per %d sec\n", a->sec);
+    sleep(a->sec); //esegui sec secondi
+    printf("[thread]Sono passati %d sec, disalloco %d bytes e termino\n", a->sec, a->mem);
+    e= free_mem(&h, a->mem);
+    assert(e==0); 
+    pthread_exit(NULL); 
 }
 
 int main(int argc, char *argv[])
 {
     heap_init(&h, HEAP_LIMIT); //inizializazione
+
+    // definisce signal handler 
+    struct sigaction sa;
+    sa.sa_handler = handler;
+    sigemptyset(&sa.sa_mask);     // setta a "insieme vuoto" sa.sa_mask maschera di segnali da bloccare 
+    sa.sa_flags = SA_RESTART;     // restart system calls  if interrupted
+    sigaction(SIGUSR1,&sa,NULL);  // handler per USR1
+    sigaction(SIGUSR2,&sa,NULL);  // handler per USR2
+
+    //h è regione critica
+    pthread_mutex_lock(&h.mutex);
+    printf("Il processo con pid %d ha un heap di %d bytes\n", getpid(), h.bytesLeft);
+    pthread_mutex_unlock(&h.mutex);
+
+    //attendiamo un segnale
+    while(true){
+        sleep(5);//la sleep si interrompe se arriva un segnale
+    }
+
 }
