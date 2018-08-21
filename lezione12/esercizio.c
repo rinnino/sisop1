@@ -109,21 +109,7 @@ void handler(int s)
 {
     int e;
     pthread_t nuovoThread;
-    /*
-    * C'e' infine un punto molto importante riguardante la creazione
-    * dei thread da parte del signal handler. Se usiamo la solita tecnica
-    * di passare attraverso la pthread_create il puntatore ad una struttura
-    * contenente l'input per il thread, è importante che questo puntatore
-    * non si riferisca ad una variabile locale dell'handler in quanto 
-    * l'handler può terminare prima che il thread abbia letto l'input: in
-    * questi caso il thread tenterebbe di accedere ad una variabile che
-    * non esiste più con possibile segmentation fault o risultati errati.
-    * Quello che è necessario fare e' passare il puntatore ad una struttura
-    * allocata con malloc che sopravvive alla terminazione del signal handler.
-    * In questo caso il thread dopo aver letto i dati deve assicurarsi di effettuare
-    * il free della struttura.
-    */
-    threadArg *a = (threadArg*) malloc(sizeof(threadArg));
+    
     printf("Segnale %d ricevuto dal processo %d\n", s, getpid());
 
     if(s==SIGUSR1) {
@@ -131,6 +117,27 @@ void handler(int s)
         //  chiedere (usando printf/scanf) due interi mem e sec e lancia un
         //  nuovo thread che alloca mem byte di memoria dall'heap condiviso,
         //  attende per sec secondi con una sleep, dealloca i mem byte e termina.
+
+        /*
+        * C'e' infine un punto molto importante riguardante la creazione
+        * dei thread da parte del signal handler. Se usiamo la solita tecnica
+        * di passare attraverso la pthread_create il puntatore ad una struttura
+        * contenente l'input per il thread, è importante che questo puntatore
+        * non si riferisca ad una variabile locale dell'handler in quanto 
+        * l'handler può terminare prima che il thread abbia letto l'input: in
+        * questi caso il thread tenterebbe di accedere ad una variabile che
+        * non esiste più con possibile segmentation fault o risultati errati.
+        * Quello che è necessario fare e' passare il puntatore ad una struttura
+        * allocata con malloc che sopravvive alla terminazione del signal handler.
+        * In questo caso il thread dopo aver letto i dati deve assicurarsi di effettuare
+        * il free della struttura.
+        * 
+        * nota mia: non basta. bisogna dichiarare con pthread_detach il thread, per forzarlo
+        * a rilasciare le risorse quando termina, senza attendere pthread_join()
+        */
+        threadArg *a = (threadArg *) malloc(sizeof(threadArg));
+        assert(a!=NULL);
+
         printf("Quanti byte allocare ? ");
         e = scanf("%d", &a->mem);
         assert(e>=0);
@@ -139,6 +146,10 @@ void handler(int s)
         assert(e>=0);
         //lancia il thread
         e = pthread_create(&nuovoThread, NULL, tbody, a);
+        assert(e==0);
+        //forziamo il thread a disallocare le risorse quando termina senza
+        //usare pthread_join()
+        e = pthread_detach(nuovoThread);
         assert(e==0);
         return;
     }else if(s==SIGUSR2){
