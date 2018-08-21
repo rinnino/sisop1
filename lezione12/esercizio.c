@@ -109,7 +109,21 @@ void handler(int s)
 {
     int e;
     pthread_t nuovoThread;
-    threadArg a;
+    /*
+    * C'e' infine un punto molto importante riguardante la creazione
+    * dei thread da parte del signal handler. Se usiamo la solita tecnica
+    * di passare attraverso la pthread_create il puntatore ad una struttura
+    * contenente l'input per il thread, è importante che questo puntatore
+    * non si riferisca ad una variabile locale dell'handler in quanto 
+    * l'handler può terminare prima che il thread abbia letto l'input: in
+    * questi caso il thread tenterebbe di accedere ad una variabile che
+    * non esiste più con possibile segmentation fault o risultati errati.
+    * Quello che è necessario fare e' passare il puntatore ad una struttura
+    * allocata con malloc che sopravvive alla terminazione del signal handler.
+    * In questo caso il thread dopo aver letto i dati deve assicurarsi di effettuare
+    * il free della struttura.
+    */
+    threadArg *a = (threadArg*) malloc(sizeof(threadArg));
     printf("Segnale %d ricevuto dal processo %d\n", s, getpid());
 
     if(s==SIGUSR1) {
@@ -118,13 +132,13 @@ void handler(int s)
         //  nuovo thread che alloca mem byte di memoria dall'heap condiviso,
         //  attende per sec secondi con una sleep, dealloca i mem byte e termina.
         printf("Quanti byte allocare ? ");
-        e = scanf("%d", &a.mem);
+        e = scanf("%d", &a->mem);
         assert(e>=0);
         printf("\nQuanti secondi di durata ? ");
-        e = scanf("%d", &a.sec);
+        e = scanf("%d", &a->sec);
         assert(e>=0);
         //lancia il thread
-        e = pthread_create(&nuovoThread, NULL, tbody, &a);
+        e = pthread_create(&nuovoThread, NULL, tbody, a);
         assert(e==0);
         return;
     }else if(s==SIGUSR2){
@@ -159,6 +173,10 @@ void *tbody(void *arg){
     printf("[thread]Sono passati %d sec, disalloco %d bytes e termino\n", a->sec, a->mem);
     e= free_mem(&h, a->mem);
     assert(e==0); 
+
+    //dobbiamo eseguire la free sull'argomento, allocato con malloc dal chiamante
+    free(a);
+
     pthread_exit(NULL); 
 }
 
