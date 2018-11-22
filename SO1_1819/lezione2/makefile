@@ -3,9 +3,12 @@ CFLAGS=-Wall -O -g -std=c99
 CC=gcc
 
 # elenco eseguibili
-EXECS=scrivi scrivisc fork leggisc leggisc_smart
+EXECS=scrivi scrivisc fork leggisc leggisc_smart conta_primi2
 
 all: $(EXECS)
+
+conta_primi2: conta_primi2.c xerrori.o
+	$(CC) $(CFLAGS) -o $@ $^
 
 leggisc_smart: leggisc_smart.c xerrori.o
 	$(CC) $(CFLAGS) -o $@ $^

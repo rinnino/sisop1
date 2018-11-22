@@ -1,5 +1,22 @@
 #include "xerrori.h"
 
+off_t fileSize(int fd, const char* nomeFile){
+  /*determinazione dimensione file */
+  off_t dimFile = lseek(fd, 0, SEEK_END);
+  if(dimFile == -1){
+    perror("Problema determinazione dimensione del file");
+    exit(1);
+  }
+  printf("dimensione file %s : %ld byte\n", nomeFile, dimFile);
+
+  /* dobbiamo riposizionare il seek all'inizio del file */
+  if(lseek(fd, 0, SEEK_SET) != 0){
+    perror("Problema riposizionamento offset con lseek");
+    exit(1);
+  }
+  return dimFile;
+}
+
 int main(int argc, char const *argv[]) {
   /* variabili */
   unsigned long long sum = 0;
@@ -15,19 +32,7 @@ int main(int argc, char const *argv[]) {
     perror("Problema con l'apertura del file");
   }
 
-  /*determinazione dimensione file */
-  off_t dimFile = lseek(fd, 0, SEEK_END);
-  if(dimFile == -1){
-    perror("Problema determinazione dimensione del file");
-    exit(1);
-  }
-  printf("dimensione file %s : %ld byte\n", argv[1], dimFile);
-
-  /* dobbiamo riposizionare il seek all'inizio del file */
-  if(lseek(fd, 0, SEEK_SET) != 0){
-    perror("Problema riposizionamento offset con lseek");
-    exit(1);
-  }
+  off_t dimFile = fileSize(fd, argv[1]);
 
   /* creazione buffer */
   /*dimFile è la dimensione del file in byte*/
