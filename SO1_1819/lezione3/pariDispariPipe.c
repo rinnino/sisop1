@@ -1,11 +1,13 @@
 #include "xerrori.h"
-
+#define MAX_FILENAME_LENGHT 1024
+#define MAX_LINE_LENGHT 1024
 int main(int argc, char const *argv[]) {
 
   /*variabili utili*/
   pid_t pid;
   int e;
   int status;
+  char nomeFile[MAX_FILENAME_LENGHT];
 
   /* controllo argv */
   if(argc != 2){
@@ -41,27 +43,33 @@ int main(int argc, char const *argv[]) {
        close(pipeDispari[0]);
        close(pipeDispari[1]); // la pipe dei dispari non ci serve
 
+       /*debug*/
+       printf("[pf%d]Ciao\n", nProc);
+
+       strcpy(nomeFile, argv[1]);
        /* creiamo un file in scrittura */
-       FILE *f = xfopen(strcat(argv[1], ".pari"),"w+",__FILE__,__LINE__);
+       FILE *f = xfopen(strcat(nomeFile, ".pari") ,"w+",__FILE__,__LINE__);
        assert(f!=NULL);
 
        /* leggiamo dalla pipe e scriviamo*/
        int fromPipe;
-       size_t ew;
        ssize_t er;
        while(true){
          er = read(pipePari[0], &fromPipe, sizeof(int));
          if(er == 0){
            break; // fine pipe
          }
+
          if(er!= sizeof(int)){
            //errore lettura
            die("[fp]Problema read pipe\n");
          }
-         ew = fwrite(&fromPipe, sizeof(int), 1, f);
-         if(ew != 1){
-           die("[fp]Problema write\n");
-         }
+
+         /*debug*/
+         printf("[pf%d]Letto da pipe: %d\n", nProc, fromPipe);
+
+         /* scrivo su file*/
+         fprintf(f, "%d\n", fromPipe);
        }
        /*chiudi file*/
        if(fclose(f) != 0){
@@ -76,13 +84,16 @@ int main(int argc, char const *argv[]) {
        close(pipePari[0]);
        close(pipePari[1]); // la pipe dei pari non ci serve
 
+       /*debug*/
+       printf("[pf%d]Ciao\n", nProc);
+
+       strcpy(nomeFile, argv[1]);
        /* creiamo un file in scrittura */
-       FILE *f = xfopen(strcat(argv[1], ".dispari"),"w+",__FILE__,__LINE__);
+       FILE *f = xfopen(strcat(nomeFile, ".dispari"),"w+",__FILE__,__LINE__);
        assert(f!=NULL);
 
        /* leggiamo dalla pipe e scriviamo*/
        int fromPipe;
-       size_t ew;
        ssize_t er;
        while(true){
          er = read(pipeDispari[0], &fromPipe, sizeof(int));
@@ -93,10 +104,12 @@ int main(int argc, char const *argv[]) {
            //errore lettura
            die("[fd]Problema read pipe");
          }
-         ew = fwrite(&fromPipe, sizeof(int), 1, f);
-         if(ew != 1){
-           die("[fd]Problema write");
-         }
+
+         /*debug*/
+         printf("[pf%d]Letto da pipe: %d\n", nProc, fromPipe);
+
+         /* scrivo su file*/
+         fprintf(f, "%d\n", fromPipe);
        }
        /*chiudi file*/
        if(fclose(f) != 0){
@@ -120,9 +133,19 @@ int main(int argc, char const *argv[]) {
     close(pipeDispari[0]);
 
     //scorriamo i numeri riga per riga ed inviamo alla giusta pipe
-    char *linea = NULL;
+    char *linea = malloc(MAX_LINE_LENGHT);
+    if(linea == NULL){
+      perror("Problema malloc\n");
+      exit(1);
+    }
+    size_t size = MAX_LINE_LENGHT;
+    if(memset(linea, 0, MAX_LINE_LENGHT) == NULL){
+      perror("Problema con memset()");
+      exit(1);
+    }
+
     int n;
-    while(getline(linea, 0, f) != -1){
+    while(getline(&linea, &size, f) != -1){
       n = atoi(linea);
       if(n%2 == 0){
         //invio a pipe pipePari
@@ -139,8 +162,12 @@ int main(int argc, char const *argv[]) {
           exit(1);
         }
       }
-      free(linea); // getline() alloca con malloc()
+      //c'era la free ora tolta
     }
+
+    //deallochiamo linea
+    free(linea);
+
     //chiudiamo le pipe (equivale a mandare eof ai consumatori)
     close(pipePari[1]);
     close(pipeDispari[1]);
@@ -165,20 +192,6 @@ int main(int argc, char const *argv[]) {
 
     printf("[P]Procedura terminata.\n");
   }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
   return 0;
 }
