@@ -56,6 +56,9 @@ int main(int argc, char const *argv[]) {
   assert(e>0);
   if(WIFEXITED(status) == true){ //se il figlio è terminato normalmente ...
     sumFiglio = WEXITSTATUS(status); // fetch valore ritornato dal figlio
+  }else{
+    fprintf(stderr, "Primi > 255 nel figlio\n" );
+    exit(1);
   }
 
   printf("numeri primi fino a %d: %d\n", n, sumFiglio + sum);
