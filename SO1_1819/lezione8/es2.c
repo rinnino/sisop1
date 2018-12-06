@@ -5,15 +5,15 @@ int *random_array(int n);
 bool check_sort(int a[], int n);
 int somma_array(int a[], int n);
 int intcmp(const void *a, const void *b);
-void mt_mergesort(int a[], int n, int limite);
-void merge(int *a, int m, int *b, int n, int *c);
 void *tbody(void *a);
 void printIntArray(int *array, int size);
+void mt_qsort(int a[], int p, int r, int limite);
+int partition(int A[], int p, int r);
 
 // struct contenente i parametri di input per i thread
 typedef struct {
   int *a;
-  int aLenght;
+  int aLenght;void mt_qsort(int a[], int p, int r, int limite)
   int *b;
   int bLenght;
   int limite;
@@ -63,64 +63,55 @@ int intcmp(const void *a, const void *b)
   return *((int *) a) - *((int *) b);
 }
 
-void mt_mergesort(int a[], int n, int limite)
+// ordina gli elementi a[p] ... a[r]
+void mt_qsort(int a[], int p, int r, int limite)
 {
-   if(n<=limite) {
+   if(r-p+1<=limite) {
      // caso base usa la funzione di libreria qsort
-    qsort(a,n,sizeof(int),intcmp);
-   }
-   //nuovo thread
+     qsort(a...);
+    }
     else {
-      pthread_t t;
-      // alloca due array b e c di lunghezza n/2 e n-n/2
-      int *b = malloc(sizeof(int)*(n/2));
-      int *c = malloc(sizeof(int)*(n-n/2));
-      threadInput in;
-      in.a = a;
-      in.aLenght = n;
-      in.b = b;
-      in.bLenght = n/2;
-      in.limite = limite;
-
-      // in parallelo:
-
-      //creazione thread
-      int e = pthread_create(&t, NULL, tbody, (void *) &in);
-      assert(e==0);
-      //   copia i secondi  n-n/2 elementi di a in c
-      memcpy(c, &a[n/2], (n-n/2)*sizeof(int));
-      //   invoca mt_mergesort(c,n-n/2,limite)
-      mt_mergesort(c, n-n/2, limite);
-      // quando entrambi i thread hanno finito
-      pthread_join(t, NULL);
-      assert(e==0);
-      printf("[mergesort]b: ");
-      printIntArray(b, n/2);
-      printf("[mmergesort]c: ");
-      printIntArray(c, n-n/2);
-      // esegui il merge di b[] e c[] in a[]
-      merge(b, n/2, c, n-n/2, a);
-      // dealloca b[] e c[]
-      free(b);
-      free(c);
+      // invoca la procedura partition per mettere in
+      // a[p] ... a[q] gli elementi "piccoli" e in a[q+1]...a[r] gli elementi "grandi"
+      // in parallelo
+      //    invoca mt_qsort(a,p,q,limite)
+      //    invoca mt_qsort(a,q+1,r,limite)
     }
 }
 
-void merge(int *a, int m, int *b, int n, int *c){
-	int pa = 0, pb = 0, pc = 0;
-	while(pa < m && pb < n){
-		if(a[pa] < b[pb])
-			c[pc++] = a[pa++];
-		else
-			c[pc++] = b[pb++];
-	}
-	if(pa == m)
-		while(pb < n)	//Array A exhausted
-			c[pc++] = b[pb++];
-	else
-		while(pa < m)	//Array B exhausted
-			c[pc++] = a[pa++];
+/* ***********************************************************
+   partition con scelta pivot mediano di 3
+   per evitare l'uso di random che e' lenta e non completamente thread safe
+   *********************************************************** */
+int partition(int A[], int p, int r)
+{
+  int t,x;
+  int i,j;
+
+  // il pivot sara' il mediano tra A[p],A[i],A[r]
+  i = (p+r)/2;
+  if( A[p] > A[i] )
+      {t=A[i];A[i]=A[p];A[p]=t;} // scambia A[i]<->A[p]
+  if( A[p] > A[r] )
+      {t=A[r];A[r]=A[p];A[p]=t;} // scambia A[r]<->A[p], ora A[p] e' il minino
+  if( A[i] > A[r] )
+      {t=A[r];A[r]=A[i];A[i]=t;} // scambia A[r]<->A[i], ora A[p]<= A[i] <= A[r]
+
+  x = A[i];                   // pivot
+  t=A[i];A[i]=A[p];A[p]=t;    // scambia A[i]<->A[p]
+
+  i= p-1; j= r+1;
+  while(1) {
+    while(A[--j]>x) ; // scan da destra a sinistra: esce se A[j]<=x
+    while(A[++i]<x) ; // scan da sinistra a destra: esce se A[i]>=x
+    if(i<j) {
+      t=A[i]; A[i]=A[j]; A[j]=t;  // scambia A[i] <-> A[j] e riprendi scansioni
+    }
+    else break;       // se i>=j termina
+  }
+  return j;
 }
+
 
 // funzione eseguita dal thread
 void *tbody(void *a)
@@ -151,13 +142,12 @@ int main(int argc, char *argv[])
   int *a = random_array(n);
   printIntArray(a, n);
   fprintf(stderr, "Somma elementi input: %d\n", somma_array(a,n));
-  mt_mergesort(a,n,limite);
+  mt_qsort(a,0,n-1,limite);
   if(check_sort(a, n))
     fprintf(stderr,"Sort OK\n");
   else
     fprintf(stderr,"Sorting fallito\n");
   fprintf(stderr, "Somma elementi output: %d\n", somma_array(a,n));
   printIntArray(a, n);
-  free(a);
   return 0;
 }
