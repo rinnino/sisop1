@@ -94,10 +94,6 @@ void mt_mergesort(int a[], int n, int limite)
       // quando entrambi i thread hanno finito
       pthread_join(t, NULL);
       assert(e==0);
-      printf("[mergesort]b: ");
-      printIntArray(b, n/2);
-      printf("[mmergesort]c: ");
-      printIntArray(c, n-n/2);
       // esegui il merge di b[] e c[] in a[]
       merge(b, n/2, c, n-n/2, a);
       // dealloca b[] e c[]
