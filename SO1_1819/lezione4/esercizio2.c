@@ -52,6 +52,7 @@ int main(int argc, char const *argv[]) {
   int flagFiglio; //indica il numero del figlio
   pid_t pid;
   int p0[2], p1[2]; // pipe per i rispettivi figli
+  int status;
 
 
   /* controllo argv */
@@ -120,6 +121,9 @@ int main(int argc, char const *argv[]) {
         }
       }
 
+      /*debug*/
+      printf("[f%d]fine invio su pipe.\n", flagFiglio);
+
       /* chiusura p0*/
       close(p0[1]);
 
@@ -131,6 +135,11 @@ int main(int argc, char const *argv[]) {
 
       /*debug*/
       printf("[f%d]Ciao\n", flagFiglio);
+
+      /*chiudiamo p0 e teniamo p1 in sola scrittura*/
+      close(p1[0]);
+      close(p0[0]);
+      close(p0[1]);
 
       /*se n è dispari questo processo deve tenere un numero in piu*/
       int dim;
@@ -154,47 +163,122 @@ int main(int argc, char const *argv[]) {
       printf("[f%d]Array da n/2 ad n ordinato: ", flagFiglio);
       printIntArray(arrayRis, dim);
 
+      /*invio a pipe p1 numero per numero*/
+      for(int i=0; i<dim; i++){
+        e = write(p1[1], &arrayRis[i], sizeof(int));
+        printf("[f%d]Invio %d\n", flagFiglio, arrayRis[i]);
+        if(e!=sizeof(int)){
+          perror("[f1]Problema con la write su p1[1]");
+          exit(1);
+        }
+      }
+
+      /*debug*/
+      printf("[f%d]fine invio su pipe.\n", flagFiglio);
+
+      /* chiusura p1*/
+      close(p1[1]);
+
       /*deallocazione heap*/
       free(array);
     }
   }else{
-    /* codice padre*/
+    /*
+     * codice padre
+     */
 
-    /*lettura da pipe*/
-    while(true){
-      /*variabili*/
-      int n0 = -1;
-      int n1 = -1;
+    /*Chiusura lato scrittura delle pipe*/
+    close(p0[1]);
+    close(p1[1]);
 
-      /*leggo un'intero da p0*/
-      e = read(p0[0], &n0, sizeof(int));
-      if(e != sizeof(int) && e != 0){
-        perror("[p]Problema con la read() pipe p");
-        exit(1);
-      }
-      if(e==0){ break; } /*dati terminati*/
+    int n0,n1; /*numeri letti da p0 e p1*/
+    bool isP0Empty = false;
+    bool isP1Empty = false;
+    int i = 0;
 
-        /*debug*/
-        printf("[p]leggo da p0: [%d]\n", n0);
+    /*prima lettura da entrambe le pipe*/
+    e = read(p0[0], &n0, sizeof(int));
+    if(e < 0){
+      perror("problema prima lettura p0");
+      exit(1);
     }
+    if(e == 0){isP0Empty = true;}
+
+    e = read(p1[0], &n1, sizeof(int));
+    if(e < 0){
+      perror("problema prima lettura p1");
+      exit(1);
+    }
+    if(e == 0){isP1Empty = true;}
+
+    /*debug*/
+    printf("[p]Leggo %d da p0 e %d da p1\n", n0, n1);
+
+    while(isP0Empty == false && isP1Empty == false){
+      if(n0<n1){
+        array[i] = n0;
+        e = read(p0[0], &n0, sizeof(int));
+        if(e < 0){
+          perror("problema lettura p0");
+          exit(1);
+        }
+        i++;
+        if(e != sizeof(int)){isP0Empty = true; printf("[p]p0 vuota.\n");}
+        if(e == sizeof(int)){ printf("[p]Leggo %d da p0\n", n0);}
+      }else{
+        array[i] = n1;
+        e = read(p1[0], &n1, sizeof(int));
+        if(e < 0){
+          perror("problema lettura p1");
+          exit(1);
+        }
+        i++;
+        if(e != sizeof(int)){isP1Empty = true; printf("[p]p1 vuota.\n");}
+        if(e == sizeof(int)){ printf("[p]Leggo %d da p1\n", n1);}
+      }
+    }
+
+    if(isP0Empty == true){
+      /*leggo ultimi valori da p1*/
+      array[i] = n1;
+      i++;
+      while(isP1Empty == false){
+        e = read(p1[0], &n1, sizeof(int));
+        if(e < 0){
+          perror("problema lettura p1");
+          exit(1);
+        }
+        if(e == sizeof(int)){ printf("[p]Leggo %d da p1\n", n1); array[i] = n1; i++;}
+        if(e != sizeof(int)){isP1Empty = true; printf("[p]p1 vuota.\n");}
+      }
+    }else{
+      /*leggo ultimi valori da p0*/
+      array[i] = n0;
+      i++;
+      while(isP0Empty == false){
+        e = read(p0[0], &n0, sizeof(int));
+        if(e < 0){
+          perror("problema lettura p0");
+          exit(1);
+        }
+        if(e == sizeof(int)){ printf("[p]Leggo %d da p0\n", n0); array[i] = n0; i++;}
+        if(e != sizeof(int)){isP0Empty = true; printf("[p]p0 vuota.\n");}
+      }
+    }
+
+
+    /*debug: stampa finale*/
+    printf("[p]Vettore ordinato ricavato dalle pipe: ");
+    printIntArray(array, atoi(argv[1]));
 
     /*chiusura delle pipe di lettura*/
     close(p0[0]);
     close(p1[0]);
 
-
-
-
-
-
-
-
-
-
-
-
     /*deallocazione heap*/
     free(array);
-  }
 
+    /* attesa figli */
+    xwait(&status, __FILE__, __LINE__);
+  }
 }
