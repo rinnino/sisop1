@@ -83,6 +83,10 @@ int main(int argc, char const *argv[]) {
   printf("[p]Array ordinato: ");
   printIntArray(array, n);
 
+  // ---- unmap e rimozione memoria condivisa
+  xmunmap(array, shm_size, __LINE__, __FILE__);
+  xshm_unlink(NAME, __LINE__, __FILE__);
+
   return 0;
 }
 
