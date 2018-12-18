@@ -11,12 +11,12 @@ LDFLAGS=-pthread -lrt
 CC=gcc
 
 # eseguibili da creare
-EXECS=es1
+EXECS=es1 es2
 
 all: $(EXECS)
 
 # regola per gli eseguibili
-es1: es1.o xerrors.o
+es%: es%.o xerrors.o
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
 # regola generale per i file oggetto
