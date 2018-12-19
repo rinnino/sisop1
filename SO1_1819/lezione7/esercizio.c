@@ -1,12 +1,5 @@
-#define _GNU_SOURCE
-#include <stdio.h>
-#include <stdlib.h>
-#include <sys/types.h>
-#include <sys/wait.h>
-#include <unistd.h>
-#include <stdbool.h>
-#include <pthread.h>
-#include <assert.h>
+#include "xerrors.h"
+#include <time.h>
 
 // prototipi di funzione
 int *random_array(int n);
@@ -132,6 +125,7 @@ int *random_array(int n)
   assert(n>0);
   int *a = malloc(n* sizeof(int));
   assert(a!=NULL);
+  srand(time(NULL));
   for(int i=0; i < n ;i++)
     a[i] = (random()%200001) - 100000;
   return a;
