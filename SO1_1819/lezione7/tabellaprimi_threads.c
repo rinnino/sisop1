@@ -30,28 +30,31 @@ bool primo(int n)
 
 // struttura usata per comunicare con i thread
 typedef struct {
-  int start;   
+  int start;
   int end;
-  int *tabella;   
-  int *tab_messi;   
+  int *tabella;
+  int *tab_messi;
   int tot;
-} dati; 
+  sem_t *sem;
+} dati;
 
 
 
 void *tbody(void *arg)
 {
-  dati *d = (dati *) arg;   
+  dati *d = (dati *) arg;
   d->tot = 0;
   for(int i=d->start;i<d->end;i++)
     if(primo(i)) {
       d->tot++;
       // necessario mettere sem_wait
-      if(*(d->tab_messi)>= MAX_TABELLA) die("Tabella piena"); 
+      xsem_wait(d->sem, __LINE__, __FILE__);
+      if(*(d->tab_messi)>= MAX_TABELLA) die("Tabella piena");
       d->tabella[*(d->tab_messi)] = i;
       *(d->tab_messi) += 1;
       // necessario mettere sem_post
-    }  
+      xsem_post(d->sem, __LINE__, __FILE__);
+    }
   pthread_exit(NULL);    // non restituisce nulla attraverso la exit
 }
 
@@ -67,21 +70,28 @@ int main(int argc, char *argv[]) {
   int p = atoi(argv[3]);
   assert(n0>0 && n1>=n0 && p>0);
 
+  //----creazione semaforo
+  sem_t *sem = malloc(sizeof(sem_t));
+  assert(sem!=NULL);
+  xsem_init(sem,0,1,__LINE__, __FILE__);
+
+
   int tabella[MAX_TABELLA]; // brutto ma veloce
-  int tab_messi = 0;   
+  int tab_messi = 0;
   pthread_t t[p];    // usato internamente per gestire i thread
   dati d[p];         // usato per passare input e output ai thread
   for(int i=0;i<p;i++) {
-    int n = (n1-n0)/p;  // quanti numeri verifica ogni figlio + o - 
+    int n = (n1-n0)/p;  // quanti numeri verifica ogni figlio + o -
     int start = n0 + n*i;
-    int end = (i==p-1) ? n1 : n0 + n*(i+1); 
-    d[i].start = start; 
+    int end = (i==p-1) ? n1 : n0 + n*(i+1);
+    d[i].start = start;
     d[i].end = end;
     d[i].tabella = tabella;
-    d[i].tab_messi = &tab_messi;  
-    xpthread_create(&t[i],NULL,tbody,&d[i],__LINE__,__FILE__);  
+    d[i].tab_messi = &tab_messi;
+    d[i].sem = sem;
+    xpthread_create(&t[i],NULL,tbody,&d[i],__LINE__,__FILE__);
   }
-  // attende terminazione dei thread 
+  // attende terminazione dei thread
   int tot=0;
   for(int i=0;i<p;i++) {
     xpthread_join(t[i], NULL,__LINE__,__FILE__);
@@ -90,5 +100,14 @@ int main(int argc, char *argv[]) {
   }
   printf("Numero primi p tali che  %d <= p < %d è: %d\n",n0,n1,tot);
   printf("Numero primi in tabella: %d\n",tab_messi);
+
+  //----disallocazione semaforo
+  int e = sem_destroy(sem);
+  if(e!=0){
+    perror("problema sem_destroy");
+    exit(1);
+  }
+  free(sem);
+
   return 0;
 }
