@@ -1,28 +1,28 @@
 /*
  * Esempio semplice paradigma produttore consumatori
- * 
+ *
  * Usare il numeri.py per generare lunghi file con interi positivi su cui testare il programma
- * 
- * 
+ *
+ *
  * Il programma e' incompleto in quanto manca un meccanismo che regoli l'accesso
  * contemporaneo alle variabili pcindex e buffer da parte dei cosumatori
  * (vedere nota nel codice)
- * 
+ *
  * Per esercizio risolvere questo problema usando un semaforo deicato alla scopo
- * 
+ *
  * Programma di esempio del paradigma 1 producer N consumer
- * i dati letti dal file vengono messi su un buffer in cui il producer scrive 
- * e i consumer leggono. In principio il buffer va bene di qualsiasi dimensione: 
+ * i dati letti dal file vengono messi su un buffer in cui il producer scrive
+ * e i consumer leggono. In principio il buffer va bene di qualsiasi dimensione:
  * piu' e' grande maggiore e' il lavoro pronto da svolgere nel caso
  * il produttore rimanga bloccato (ad esempio a leggere dal disco)
- * 
+ *
  * */
 #include "xerrors.h"
 
 #define Buf_size 10
 
 
-// funzione per stabilire se n e' primo  
+// funzione per stabilire se n e' primo
 bool primo(int n)
 {
   if(n<2) return false;
@@ -32,21 +32,22 @@ bool primo(int n)
   return true;
 }
 
-// struct contenente i parametri di input e output di ogni thread 
+// struct contenente i parametri di input e output di ogni thread
 typedef struct {
   int quanti;   // output
   long somma;   // output
-  int *buffer; 
+  int *buffer;
   int *pcindex;
   sem_t *sem_free_slots;
-  sem_t *sem_data_items;  
+  sem_t *sem_data_items;
+  pthread_mutex_t *mutex;
 } dati;
 
 
 
 // funzione eseguita dai thread consumer
 void *tbody(void *arg)
-{  
+{
   dati *a = (dati *)arg;
   int n;
   a->quanti = a->somma = 0;
@@ -56,16 +57,18 @@ void *tbody(void *arg)
     // zona di codice critico in cui piu' consumatori possono accedere
     // in lettura e scrittura alla stessa variabile a->pcindex
     // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    xpthread_mutex_lock(a->mutex, __LINE__, __FILE__);
     n = a->buffer[*(a->pcindex) % Buf_size];
     *(a->pcindex) += 1;
+    xpthread_mutex_unlock(a->mutex, __LINE__, __FILE__);
     xsem_post(a->sem_free_slots,__LINE__,__FILE__);
     if(n>=0 && primo(n)) {
       a->quanti += 1;
       a->somma += n;
     }
   } while(n!= -1);
-  pthread_exit(NULL); 
-}     
+  pthread_exit(NULL);
+}
 
 
 int main(int argc, char *argv[])
@@ -79,27 +82,36 @@ int main(int argc, char *argv[])
   assert(p>=0);
   int tot_primi = 0;
   long tot_somma = 0;
-  int i,e,n;    
+  int i,e,n;
   // threads related
   int buffer[Buf_size];
   int cindex=0, pindex=0;
   pthread_t t[p];
   dati a[p];
   sem_t sem_free_slots, sem_data_items;
-  
+  pthread_mutex_t mutex;
+
   // inizializzazione semafori
   xsem_init(&sem_free_slots, 0, Buf_size,__LINE__,__FILE__);
   xsem_init(&sem_data_items, 0, 0,__LINE__,__FILE__);
+
+  // inizializazzione mutex
+  pthread_mutexattr_t attr;
+  pthread_mutexattr_init(&attr);
+  pthread_mutexattr_setpshared(&attr,PTHREAD_PROCESS_SHARED);
+  xpthread_mutex_init(&mutex, &attr, __LINE__, __FILE__);
+
   //  creo i thread consumatori
   for(i=0;i<p;i++) {
     a[i].buffer = buffer;
     a[i].pcindex = &cindex;
     a[i].sem_data_items  = &sem_data_items;
     a[i].sem_free_slots  = &sem_free_slots;
+    a[i].mutex = &mutex;
     xpthread_create(&t[i], NULL, tbody, (void *) &a[i],__LINE__,__FILE__);
   }
 
-  // read file and count primes 
+  // read file and count primes
   FILE *f = fopen(argv[1],"r");
   if(f==NULL) {perror("Errore apertura file"); return 1;}
   while(true) {
@@ -135,7 +147,10 @@ int main(int argc, char *argv[])
     tot_somma += a[i].somma;
   }
 
+  //distruzione mutex
+  xpthread_mutex_destroy(&mutex, __LINE__, __FILE__);
+
   fprintf(stderr,"Trovati %d primi con somma %ld\n",tot_primi,tot_somma);
+
   return 0;
 }
-
