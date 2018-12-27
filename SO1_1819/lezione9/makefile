@@ -1,21 +1,25 @@
 # makefile che utilizza regole implicite e variabili
 #
-# usare 
-#    make <nome_eseguibile> 
+# usare
+#    make <nome_eseguibile>
 # per compilare un unico programma, o semplicemente
 #    make
-# per compilarli tutti 
+# per compilarli tutti
 #
 CFLAGS=-Wall -std=c99 -g -O
 LDFLAGS=-pthread -lrt
 CC=gcc
 
 # eseguibili da creare
-EXECS=incompleto
+EXECS=incompleto es1Thread
 
 all: $(EXECS)
 
 # regole per gli eseguibili
+
+es1Thread: es1Thread.o xerrors.o
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
 incompleto: incompleto.o  xerrors.o
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
@@ -29,7 +33,7 @@ xerrors.o: xerrors.c  xerrors.h
 	$(CC) $(CFLAGS) -o xerrors.o -c xerrors.c
 
 
-# utile per il docente per creare un archvio da mettere su DIR 
+# utile per il docente per creare un archvio da mettere su DIR
 tarfile:
 	tar -zcf lezione.tgz makefile *.c *.h
 
