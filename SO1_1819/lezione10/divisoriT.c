@@ -13,9 +13,10 @@
 
 // funzione eseguita dal thread produttore
 void *tbodyp(void *arg);
-
 // funzione eseguita dal thread consumatore
 void *tbodyc(void *arg);
+//restituisce il numero di divisori di n
+int divisori(int n);
 
 typedef struct {
   sem_t *sem_free_slots;
@@ -27,13 +28,20 @@ typedef struct {
   int cindex;
 } pcBuffer;
 
-//struttura dati per thread
+//struttura dati per thread produttore
 typedef struct{
   const char *inFile;
-  const char *outFile;
   pcBuffer *pcbuff;
   int threadFlag;
-}threadArg;
+}threadArgp;
+
+//struttura dati per thread consumatore
+typedef struct{
+  FILE *outFile;
+  pcBuffer *pcbuff;
+  int threadFlag;
+  pthread_mutex_t *mutexFile;
+}threadArgc;
 
 int main(int argc, char const *argv[]) {
   if(argc<4) {
@@ -61,43 +69,72 @@ int main(int argc, char const *argv[]) {
   pthread_mutexattr_setpshared(&attr,PTHREAD_PROCESS_SHARED);
   xpthread_mutex_init(buff_pc.mutex, &attr, __LINE__, __FILE__);
 
+  //init mutex del file di output
+  pthread_mutex_t *mutexFile = malloc(sizeof(pthread_mutex_t));
+  xpthread_mutex_init(mutexFile, &attr, __LINE__, __FILE__);
+
   //thread produttori
   pthread_t produttori[argc-3];
   //debug
   printf("[t1]Faccio partire %d produttori\n", argc-3);
 
-  //prepariamo gli argomenti da passare ai thread
-  threadArg arg[argc-3];
+  //prepariamo gli argomenti da passare ai thread produttori
+  threadArgp arg[argc-3];
   //debug
   printf("[t1]Il file di output sarà %s\n", argv[argc-2]);
   //lanciamo i thread produttori
   for(int i=0; i<argc-3; i++){
     //debug
     printf("[t1]Invoco il thread tp%d che lavorera sul file %s\n", i+1, argv[i+1]);
-    arg[i].outFile = argv[argc-2];
     arg[i].pcbuff = &buff_pc;
     arg[i].inFile = argv[i+1];
     arg[i].threadFlag = i+1;
     xpthread_create(&produttori[i], NULL, tbodyp, (void *) &arg[i], __LINE__, __FILE__);
   }
 
+  int nConsumatori = atoi(argv[argc-1]);
+
+  //thread consumatori
+  pthread_t consumatori[nConsumatori]; //numt thread consumatori
+
+  //prepariamo gli argomenti da passare ai thread
+  threadArgc argcons[nConsumatori];
+
+  //apriamo il file di output
+  FILE *f = xfopen(argv[argc-2], "wt", __LINE__, __FILE__);
+  if(f == NULL){
+    perror("[t1]Problema con l'apertura del file di output");
+  }
 
 
+  //lanciamo i thread consumatori
+  for(int i=0; i<nConsumatori; i++){
+    argcons[i].outFile = f;
+    argcons[i].pcbuff = &buff_pc;
+    argcons[i].threadFlag = i+1;
+    argcons[i].outFile = f;
+    argcons[i].mutexFile = mutexFile;
+    xpthread_create(&consumatori[i], NULL, tbodyc, (void *) &argcons[i], __LINE__, __FILE__);
+  }
 
-
-
-
-
-
-
-
-
-
-
-
-  //join dei vari thread
+  //join dei thread produttori
   for(int i=0; i<argc-3; i++){
     xpthread_join(produttori[i], NULL,__LINE__,__FILE__);
+  }
+
+  //segnalazione terminazione ai thread consumatori
+  for(int i=0; i<nConsumatori; i++){
+    xsem_wait(buff_pc.sem_free_slots, __LINE__, __FILE__);
+    xpthread_mutex_lock(buff_pc.mutex, __LINE__, __FILE__);
+    buff_pc.buff[buff_pc.pindex%buff_pc.buffSize]=-1;
+    buff_pc.pindex+=1;
+    xpthread_mutex_unlock(buff_pc.mutex, __LINE__, __FILE__);
+    xsem_post(buff_pc.sem_data_items, __LINE__, __FILE__);
+  }
+
+  //join threads consumatori
+  for(int i=0; i<nConsumatori; i++){
+    xpthread_join(consumatori[i], NULL,__LINE__,__FILE__);
   }
 
   //distruziome semafori e mutex del buffer
@@ -106,19 +143,25 @@ int main(int argc, char const *argv[]) {
   e = sem_destroy(buff_pc.sem_data_items);
   assert(e==0);
   xpthread_mutex_destroy(buff_pc.mutex, __LINE__, __FILE__);
+  xpthread_mutex_destroy(mutexFile, __LINE__, __FILE__);
 
   //free memoria allocata
   free(buff_pc.sem_free_slots);
   free(buff_pc.sem_data_items);
   free(buff_pc.mutex);
   free(buff_pc.buff);
+  free(mutexFile);
+
+  //chiusura file output
+  e = fclose(f);
+  assert(e==0);
 
   return 0;
 }
 
 // funzione eseguita dal thread produttore
 void *tbodyp(void *arg){
-  threadArg *a = (threadArg *)arg;
+  threadArgp *a = (threadArgp *)arg;
   //debug
   printf("[tp%d]Ciao, io sono il produttore del file %s\n", a->threadFlag,
                                                             a->inFile);
@@ -139,12 +182,13 @@ void *tbodyp(void *arg){
   }
   //lettura da file
   size_t size = Max_line_len;
+  int n;
   while(getline(&linea, &size, f)!=-1){
     //debug
     //printf("[tp%d]%s", a->threadFlag, linea);
 
     //produzione: inserisco il numero appena letto nel buffer condiviso
-    int n = atoi(linea);
+    n = atoi(linea);
     xsem_wait(a->pcbuff->sem_free_slots, __LINE__, __FILE__);
     xpthread_mutex_lock(a->pcbuff->mutex, __LINE__, __FILE__);
     a->pcbuff->buff[(a->pcbuff->pindex)%(a->pcbuff->buffSize)] = n;
@@ -156,23 +200,43 @@ void *tbodyp(void *arg){
     xpthread_mutex_unlock(a->pcbuff->mutex, __LINE__, __FILE__);
     xsem_post(a->pcbuff->sem_data_items, __LINE__, __FILE__);
   }
-  //segnalo terminazione
-  xsem_wait(a->pcbuff->sem_free_slots, __LINE__, __FILE__);
-  xpthread_mutex_lock(a->pcbuff->mutex, __LINE__, __FILE__);
-  a->pcbuff->buff[(a->pcbuff->pindex)%(a->pcbuff->buffSize)] = -1;
-  //debug
-  printf("[tp%d]Inserisco %d nella posizione %d\n", a->threadFlag,
-              a->pcbuff->buff[(a->pcbuff->pindex)%(a->pcbuff->buffSize)],
-              (a->pcbuff->pindex)%(a->pcbuff->buffSize));
-  a->pcbuff->pindex+=1;
-  xpthread_mutex_unlock(a->pcbuff->mutex, __LINE__, __FILE__);
-  xsem_post(a->pcbuff->sem_data_items, __LINE__, __FILE__);
   free(linea);
+  int e = fclose(f);
+  assert(e==0);
   pthread_exit(NULL);
 }
 
 // funzione eseguita dal thread consumatore
 void *tbodyc(void *arg){
-  threadArg *a = (threadArg *)arg;
+  threadArgc *a = (threadArgc *)arg;
+  int n;
+  //consumatore: prelevo un'intero dal buffer e lo scrivo su file affianco
+  // al suo numero di divisori
+  while(true){
+    xsem_wait(a->pcbuff->sem_data_items, __LINE__, __FILE__);
+    xpthread_mutex_lock(a->pcbuff->mutex, __LINE__, __FILE__);
+    n = a->pcbuff->buff[(a->pcbuff->cindex)%(a->pcbuff->buffSize)];
+    a->pcbuff->cindex+=1;
+    xpthread_mutex_unlock(a->pcbuff->mutex, __LINE__, __FILE__);
+    xsem_post(a->pcbuff->sem_free_slots, __LINE__, __FILE__);
+    //debug
+    printf("[tc%d]Consumo %d\n", a->threadFlag, n );
+    if(n!=-1){
+      xpthread_mutex_lock(a->mutexFile, __LINE__, __FILE__);
+      fprintf(a->outFile, "%d %d\n", n, divisori(n));
+      xpthread_mutex_unlock(a->mutexFile, __LINE__,__FILE__);
+    }else{
+      break;
+    }
+  }
+
   pthread_exit(NULL);
+}
+
+//restituisce il numero di divisori di n
+int divisori(int n){
+  int div = 2;
+  for(int i=2;i<n;i++)
+    if(n%i==0) div++;
+  return div;
 }

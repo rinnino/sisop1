@@ -11,11 +11,14 @@ LDFLAGS=-pthread -lrt
 CC=gcc
 
 # eseguibili da creare
-EXECS=divisoriT
+EXECS=divisoriT esempioSvolto
 
 all: $(EXECS)
 
 # regole per gli eseguibili
+
+esempioSvolto: esempioSvolto.o xerrors.o
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
 divisoriT: divisoriT.o xerrors.o
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
