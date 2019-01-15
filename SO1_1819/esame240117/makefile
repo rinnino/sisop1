@@ -11,7 +11,7 @@ LDFLAGS=-pthread -lrt
 CC=gcc
 
 # eseguibili da creare
-EXECS=thread
+EXECS=thread processi
 
 all: $(EXECS)
 
@@ -19,6 +19,10 @@ all: $(EXECS)
 
 thread: thread.o xerrors.o
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
+processi: processi.o xerrors.o
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
 
 # regola generale per i file oggetto
 %.o: %.c xerrors.h

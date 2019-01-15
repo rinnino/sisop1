@@ -1,0 +1,57 @@
+Compito del 24/1/17
+Premessa
+
+L'esame ha lo scopo di verificare cosa avete imparato degli argomenti del corso. Per questo motivo le vostre soluzioni saranno valutate sul come fanno le cose e non semplicemente sul cosa fanno. Quindi un programma che restituisce il risultato corretto non è necessariamente una buona soluzione: vengono anche valutati quali strumenti avete usato e in che modo. E' sicuramente una buona idea giustificare le proprie scelte di implementazione (dovete comunque seguire le traccie indicate). E' considerato un errore non verificare i valori restituiti dalle chiamate di sistema (potete usare le funzioni in xerrors.c a questo scopo).
+Esperimenti
+
+Gli esercizi di oggi richiedono di calcolare la somma dei quadrati di una sequenza di interi contenuti in un file di testo (uno per riga). Per fare gli esperimenti potete usare lo script Python riportato qui sotto che crea un file di interi e visualizza la somma dei loro quadrati.
+
+#! /usr/bin/env python3
+import random
+import sys
+
+def main(n,nomefile):
+  f = open(nomefile,"w");
+  tot = 0;
+  for i in range( n ):
+    x = random.randint(-100, 100)
+    print(x,file=f)
+    tot += x*x
+  f.close();
+  print("Somma dei quadrati:", tot);
+
+if len(sys.argv)!=3:
+  print("Uso:\n\t %s numero_interi file" % sys.argv[0])
+else:
+  main(int(sys.argv[1]), sys.argv[2] )
+
+Esercizio 1 (processi)
+
+Scrivere un programma sommeP che invocato dalla linea di comando scrivendo
+
+  sommeP N nomefile
+
+calcola la somma dei quadrati degli interi memorizzati nel file di testo di nome nomeFile utilizzando N processi figli. Il processo padre deve comunicare con i processi figli solo attraverso delle pipe: si utilizzi una pipe pipedown per le comunicazioni dal padre ai figli, e una pipe pipeup per le comunicazioni tra figli e padre.
+
+L'idea di base è che il processo padre legge i valori dal file e li comunica ai figli attraverso pipedown. Ogni figlio riceve un certo numero di valori e calcola la somma dei quadrati dei valori ricevuti e comunica la somma al padre attraverso pipeup. Il padre raccoglie tutte le somme e visualzza il risultato finale.
+
+Piu' in dettaglio, il processo padre deve:
+
+    generare N processi figli
+    aprire il file nomefile
+    leggere un intero alla volta dal file e appena letto deve scriverlo nella pipe pipedown
+    terminata la lettura da nomefile deve chiudere nomefile e pipedown e leggere da pipeup le somme parziali restituite dai processi figli (1 per per figlio); deve poi calcolare la somma dei valori ricevuti e visualizzarla
+
+I processi figli devono:
+
+    inizializzare una variabile somma a 0
+    leggere gli interi da pipedown; ogni intero ricevuto deve essere elevato al quadrato e aggiunto a somma
+    dopo aver terminato la lettura, il valore di somma deve essere inviato al padre attraverso pipeup
+
+Esercizio 2 (thread)
+
+In questo caso il calcolo deve essere fatto utilizzano il paradigma produttore/consumatore, utilizzando come al solito un buffer per la memorizzazione dei job e due semafori per l'accesso al buffer. Dando il comando
+
+  sommeT N nomefile
+
+devono essere generati N thread produttori che leggono gli interi dal file. Si noti che tutti i produttori accedono allo stesso file quindi è opportuno regolre l'accesso mediante un mutex. Per ogni intero letto il suo quadrato deve essere scritto sul buffer. Il thread principale, dopo aver lanciato i thread secondari, deve agire da consumatore leggendo i quadrati dal buffer e calcolando la loro somma. Come in tutti gli schemi produttore-consumatore è importante stabilire un meccanismo che permetta ai produttori di segnalare al consumatore che non ci sono altri valori da elaborare. Si noti anche che il consumatore deve essere sicuro che non ci siano altri valori in arrivo prima di restituire il risultato. La dimensione del buffer deve essere una costante, modificabile attraverso la compilazione (cioè espressa attraverso un #define).
