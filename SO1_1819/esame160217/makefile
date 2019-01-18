@@ -11,7 +11,7 @@ LDFLAGS=-pthread -lrt
 CC=gcc
 
 # eseguibili da creare
-EXECS=processi
+EXECS=processi thread
 
 all: $(EXECS)
 
