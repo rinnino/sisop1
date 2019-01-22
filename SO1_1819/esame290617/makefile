@@ -11,13 +11,16 @@ LDFLAGS=-pthread -lrt
 CC=gcc
 
 # eseguibili da creare
-EXECS=primiP
+EXECS=primiP primiT
 
 all: $(EXECS)
 
 # regole per gli eseguibili
 
 primiP: primiP.o xerrors.o
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
+primiT: primiT.o xerrors.o
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
 # regola generale per i file oggetto
