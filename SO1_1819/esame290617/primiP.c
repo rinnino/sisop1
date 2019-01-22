@@ -53,11 +53,11 @@ int main(int argc, char const *argv[]) {
       }
       t+=2*nProcessi;
     }
-    //scriviamo sulla pipe per inviarlo al padre
+    //scriviamo sulla pipe per inviare la somma parziale al padre
     ssize_t ew;
     ew = write(p[1], &sum, sizeof(int));
     if(ew != sizeof(int)){
-      perror("[p]Problema con la write pipeDown");
+      perror("[p]Problema con la write pipe p");
       exit(1);
     }
     //chiudo la pipe
