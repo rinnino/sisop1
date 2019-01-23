@@ -11,7 +11,7 @@ LDFLAGS=-pthread -lrt
 CC=gcc
 
 # eseguibili da creare
-EXECS=divisoriT
+EXECS=divisoriT divisoriP
 
 all: $(EXECS)
 
