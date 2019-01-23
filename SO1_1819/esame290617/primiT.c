@@ -90,6 +90,7 @@ int main(int argc, char const *argv[]) {
 
   // fine
   xpthread_mutex_destroy(&mutex_buf,__LINE__,__FILE__);
+  fclose(f);
   return 0;
 }
 
